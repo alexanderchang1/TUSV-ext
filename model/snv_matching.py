@@ -22,10 +22,11 @@ def one_hot_encoding(index_list, category_list):
     encoding[:, index_list] = 1
     return encoding
 
-def snv_assign(C_CNV, Q, A, E, U, F, G):
+def snv_assign(C_CNV, Q, A, E, U, F, G_unsampled):
     """
     the function for assigning unsampled SNVs to the trees, using brutal force with minimum
     distance criteria to identify the possible branch and allele of a SNV given
+
     n - number of clones
     m - number of samples
     l - number of SVs
@@ -33,17 +34,27 @@ def snv_assign(C_CNV, Q, A, E, U, F, G):
     g - number of sampled SNVs
     g_un - number of unsampled SNVs
     r - number of CNVs
+
     :param C_CNV: n*2r allelic specific CNV
     :param Q: (l_un + g_un) * r mapping matrix which maps the unsampled SNVs to CNV segments, q_ij=1 if ith SNV maps to jth CNV
     :param A: n*n, a_ij = 1 if i is the ancestor of j, diagonal is 0, which means i is not the ancestor of i
     :param U: m*n frequency matrix
     :param F: m*g_un frequency matrix
-    :param G: l_un*l_un unsampled breakpoints pairing matrix
+    :param G_unsampled: l_un*l_un unsampled breakpoints pairing matrix
     :return:
     """
     n, r = C_CNV.shape
     l_g_un = Q.shape[0]
-    l_un = G.shape[0]
+
+    if G_unsampled is None:
+        print("Warning: G_unsampled is None. Skipping unsampled breakpoint operations.")
+
+    if G_unsampled is None:
+        l_un = 0
+    else:
+        l_un = G_unsampled.shape[0]
+
+
     r = int(r/2)
     clone_idx_range = range(0, n-1) # exclude the root node
     C_hat_1 = np.dot(C_CNV[:, :r], np.transpose(Q)) # n*l_g_un, the copy number of CNV at SNV position
@@ -78,8 +89,10 @@ def snv_assign(C_CNV, Q, A, E, U, F, G):
                                                     valid_snv_idx2])
         dist[valid_snv_idx2] = np.sum(np.abs(F_est - F[:, valid_snv_idx2]), axis=0)
 
-        dist[: l_un] += np.dot(dist[:l_un], G) #add the other corresponding breakpoint distance to original breakpoint to ensure paired breakpoints are at the same node
-        dist[: l_un] /= 2
+        if G_unsampled is not None:
+            dist[: l_un] += np.dot(dist[:l_un], G_unsampled)
+            dist[: l_un] /= 2
+
         dist_stack = np.column_stack((min_dist, dist))
         argmin = np.argmin(dist_stack, axis=-1)
         if (argmin == 1).any():
@@ -94,8 +107,9 @@ def snv_assign(C_CNV, Q, A, E, U, F, G):
         F_est = U[:, b][:,np.newaxis] + np.dot(U, A[b, :][:, np.newaxis] * C_hat_2[:, valid_snv_idx2] / C_SNV_clone_2[valid_snv_idx2])
         dist[valid_snv_idx2] = np.sum(np.abs(F_est - F[:, valid_snv_idx2]),axis=0)
 
-        dist[: l_un] += np.dot(dist[:l_un], G) #add the other corresponding breakpoint distance to original breakpoint to ensure paired breakpoints are at the same node
-        dist[: l_un] /= 2
+        if G_unsampled is not None:
+            dist[: l_un] += np.dot(dist[:l_un], G_unsampled) #add the other corresponding breakpoint distance to original breakpoint to ensure paired breakpoints are at the same node
+            dist[: l_un] /= 2
 
         dist_stack = np.column_stack((min_dist, dist))
         argmin = np.argmin(dist_stack, axis=-1)
@@ -126,7 +140,8 @@ if __name__ == '__main__':
                   [1, 1, 0, 0],
                   [1, 1, 1, 0]])
     Q = np.eye(4)
-    G = np.eye(2)
+    #G = np.eye(2)
+    G = None
     C_SNV = np.array([[1, 1, 4, 0],
                       [2, 1, 1, 1],
                       [1, 1, 1, 0],
@@ -138,3 +153,4 @@ if __name__ == '__main__':
     F_true = np.dot(U, C_SNV)
     F_noise = F_true + np.random.normal(scale=0.2,size=np.shape(F_true) )
     min_node, min_dist, W_snv = snv_assign(C_CNV, Q, A, E, U, F_noise, G)
+    print("test_successful")
