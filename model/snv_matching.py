@@ -64,12 +64,16 @@ def snv_assign(C_CNV, Q, A, E, U, F, G_unsampled):
     min_dist = np.full((l_g_un), 10000)
     min_node = np.full((l_g_un), -1)
     dist = np.full((l_g_un), np.inf)
+
+    print("Shape of min_node: {}".format(min_node.shape))
+
     for b in clone_idx_range:
         ### normal copy number=1
         C_SNV_clone_1 = C_hat_1[b, :] # l_g_un
         C_SNV_clone_2 = C_hat_2[b, :]
         C_SNV_clone_parent_1 = C_hat_1_parent[b, :]
         C_SNV_clone_parent_2 = C_hat_2_parent[b, :]
+
 
         valid_snv_idx = np.array(list(set(np.append(np.where(C_SNV_clone_1 == 1)[0],np.where(C_SNV_clone_1 - C_SNV_clone_parent_1 > 1)[0]))))
         F_est = U[:,b][:,np.newaxis] * C_SNV_clone_1[valid_snv_idx] + np.dot(U, A[b, :][:,np.newaxis]* C_hat_1[:,valid_snv_idx])
@@ -92,12 +96,30 @@ def snv_assign(C_CNV, Q, A, E, U, F, G_unsampled):
         if G_unsampled is not None:
             dist[: l_un] += np.dot(dist[:l_un], G_unsampled)
             dist[: l_un] /= 2
-
         dist_stack = np.column_stack((min_dist, dist))
         argmin = np.argmin(dist_stack, axis=-1)
-        if (argmin == 1).any():
-            min_node[argmin == 1] = b
-            min_dist = np.min(dist_stack, axis=-1)
+
+        print("Shape of valid_snv_idx: {}".format(valid_snv_idx.shape))
+        print("Shape of argmin: {}".format(argmin.shape))
+
+        # Create a boolean mask of the same shape as argmin
+        mask = np.zeros(argmin.shape, dtype=bool)
+        mask[valid_snv_idx] = True
+
+        
+        print("Shape of mask: {}".format(mask.shape))
+        
+        # Use the mask to select indices where both conditions are true
+        valid_indices = np.logical_and(argmin == 1, mask)
+
+        print("Shape of valid_indices: {}".format(valid_indices.shape))
+        print("Number of True values in valid_indices: {}".format(np.sum(valid_indices)))
+
+
+
+        min_node[valid_indices] = b
+        min_dist[valid_indices] = np.min(dist_stack[valid_indices], axis=-1)
+
 
         valid_snv_idx = np.array(list(set(np.append(np.where(C_SNV_clone_2 == 1)[0],np.where(C_SNV_clone_2 - C_SNV_clone_parent_2 > 1)[0]))))
         F_est = U[:, b][:,np.newaxis] * C_SNV_clone_2[valid_snv_idx] + np.dot(U, A[b, :][:, np.newaxis] * C_hat_2[:, valid_snv_idx])
@@ -113,12 +135,32 @@ def snv_assign(C_CNV, Q, A, E, U, F, G_unsampled):
 
         dist_stack = np.column_stack((min_dist, dist))
         argmin = np.argmin(dist_stack, axis=-1)
-        if (argmin == 1).any():
-            min_node[valid_snv_idx[argmin == 1]] = b
-            min_dist[valid_snv_idx] = np.min(dist_stack, axis=-1)
+
+        print("Shape of valid_snv_idx: {}".format(valid_snv_idx.shape))
+        print("Shape of argmin: {}".format(argmin.shape))
+
+        # Create a boolean mask of the same shape as argmin
+        mask = np.zeros(argmin.shape, dtype=bool)
+        mask[valid_snv_idx] = True
+
+        print("Shape of mask: {}".format(mask.shape))
+        
+        # Use the mask to select indices where both conditions are true
+        valid_indices = np.logical_and(argmin == 1, mask)
+
+        print("Shape of valid_indices: {}".format(valid_indices.shape))
+        print("Number of True values in valid_indices: {}".format(np.sum(valid_indices)))
+
+
+        min_node[valid_indices] = b
+        min_dist[valid_indices] = np.min(dist_stack[valid_indices], axis=-1)
+
+
+
     W_snv = np.zeros((n, len(min_node)))
     for i in range(len(min_node)):
-        W_snv[min_node[i], i] = 1
+        if min_node[i] >= 0:
+            W_snv[min_node[i], i] = 1
     return min_node, min_dist, W_snv
 
 
