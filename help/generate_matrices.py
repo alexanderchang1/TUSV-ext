@@ -398,7 +398,9 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                     if bp_idx in sampled_sv_idx_list_sorted:
                         new_idx = np.where(sampled_sv_idx_list_sorted == bp_idx)[0][0]
                         #F[sample_idx][bp_idx] = cn
-                        F_SV[sample_idx][new_idx] = cn
+                     
+                        F_SV[sample_idx][new_idx] = cn[0] if isinstance(cn, list) else cn
+
 
                         # A[sample_idx][bp_idx] = bdp
                         # H[sample_idx][bp_idx] = dp
@@ -422,7 +424,9 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                     else:
                         new_idx = np.where(unsampled_sv_idx_list_sorted == bp_idx)[0][0]
                     #F[sample_idx][bp_idx] = cn
-                        F_SV_unsampled[sample_idx][new_idx] = cn
+                    
+                        F_SV[sample_idx][new_idx] = cn[0] if isinstance(cn, list) else cn
+
 
                         # A[sample_idx][bp_idx] = bdp
                         # H[sample_idx][bp_idx] = dp
@@ -450,7 +454,7 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
             cn = SNV_sample_dict[sample][(chrom, pos)]
             if snv_idx in sampled_snv_idx_list_sorted:
                 new_idx = np.where(sampled_snv_idx_list_sorted == snv_idx)[0][0]
-                F_SNV[sample_idx][new_idx] = cn
+                F_SNV[sample_idx][new_idx] = cn[0] if isinstance(cn, list) else cn
                 if chrom in list(seg_dic.keys()):
                     cn_idx = _get_seg_idx(seg_dic[chrom], pos)
                     if cn_idx != None:
@@ -463,7 +467,7 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                         pos) + " is not found in copy number info."))
             else:
                 new_idx = np.where(unsampled_snv_idx_list_sorted == snv_idx)[0][0]
-                F_SNV_unsampled[sample_idx][new_idx] = cn
+                F_SNV_unsampled[sample_idx][new_idx] = cn[0] if isinstance(cn, list) else cn
                 if chrom in list(seg_dic.keys()):
                     cn_idx = _get_seg_idx(seg_dic[chrom], pos)
                     if cn_idx != None:
