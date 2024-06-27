@@ -36,8 +36,8 @@ class Writer:
 		self.bps = {} # key is id. val is BP
 		self.cvs = {} # key is id. val is CV
 		self.snvs = {} ###xf: key is id. val is vaf
-		self.snames = [ BULK_TUMOR_PREFIX + str(i+1) for i in xrange(0, num_samples) ] # name of each bulk tumor sample column
-		self.cnames = [ str(i) for i in xrange(0, num_clones) ] # name of each cell type sample column
+		self.snames = [ BULK_TUMOR_PREFIX + str(i+1) for i in range(0, num_samples) ] # name of each bulk tumor sample column
+		self.cnames = [ str(i) for i in range(0, num_clones) ] # name of each cell type sample column
 		self.metadata_fname = metadata_fname
 
 	#  input: chrm (str) chromosome
@@ -69,7 +69,7 @@ class Writer:
 		reader.metadata['filedate'][0] = datetime.datetime.now().date().strftime('%Y%m%d') # set date to current date
 		writer = vcf.Writer(file, reader)
 
-		muts = _merge_dicts(self.bps, self.cvs).values()
+		muts = list(_merge_dicts(self.bps, self.cvs).values())
 		muts.sort(key = lambda mut: mut.pos, reverse = False)
 		muts.sort(key = lambda mut: mut.chrm, reverse = False)
 		for mut in muts:
@@ -167,9 +167,9 @@ def _set_mates(bp1, bp2):
 
 def _merge_dicts(d1, d2):
 	d3 = {}
-	for k, v in d1.iteritems():
+	for k, v in d1.items():
 		d3[k] = v
-	for k, v in d2.iteritems():
+	for k, v in d2.items():
 		d3[k] = v
 	return d3
 

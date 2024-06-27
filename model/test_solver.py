@@ -18,7 +18,7 @@ def main(argv):
 	f_scale = 5
 
 	U = gen_U(m, n)
-	Q = np.array([ np.arange(0, r) == random.randint(0, r-1) for bp in xrange(l) ], dtype = int)
+	Q = np.array([ np.arange(0, r) == random.randint(0, r-1) for bp in range(l) ], dtype = int)
 	F = gen_F(Q, m, l, r, f_scale)
 	G = gen_G(l)
 	A = np.random.binomial(100, 0.25, [m, l])
@@ -37,10 +37,10 @@ def main(argv):
 def gen_F(Q, m, l, r, f_scale):
 	h_scale = float(f_scale) / 2.0 # scale for breakpoints
 	F = h_scale * np.random.rand(m, l + r)
-	for b in xrange(0, l):
-		for s in xrange(0, r):
+	for b in range(0, l):
+		for s in range(0, r):
 			if Q[b, s] == 1:
-				for p in xrange(0, m):
+				for p in range(0, m):
 					F[p, l+s] = max(F[p, l+s], F[p, b])
 					F[p, l+s] += h_scale * np.random.rand()
 	return F
@@ -48,7 +48,7 @@ def gen_F(Q, m, l, r, f_scale):
 # mated pair binary matrix
 def gen_G(l):
 	G = np.zeros((l, l))
-	I = [ x for x in xrange(0, l) ]   # list of all indicies
+	I = [ x for x in range(0, l) ]   # list of all indicies
 	random.shuffle(I)                 # randomly permut to make random pairs
 	I = np.array(I).reshape((l/2, 2)) # make a l/2 by 2 numpy array of mated pairs
 	for i, j in I:
@@ -69,7 +69,7 @@ def gen_C(n, l, r):
 def gen_U(m, n):
 	U = np.random.rand(m, 2*n-1)
 	rowsums = np.sum(U, 1)
-	for i in xrange(m):
+	for i in range(m):
 		U[i, :] = U[i, :] / rowsums[i]
 	return U
 

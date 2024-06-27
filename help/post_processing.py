@@ -61,9 +61,9 @@ def _get_T(file):
 
 	parent_child_table = []
 	for i, j in edges:
-		if i in edge_labels.keys():
+		if i in list(edge_labels.keys()):
 			i = i + edge_labels[i]
-		if j in edge_labels.keys():
+		if j in list(edge_labels.keys()):
 			j = j + edge_labels[j]
 		parent_child_table.append((i, j, 1))
 	return Tree.from_parent_child_table(parent_child_table)
