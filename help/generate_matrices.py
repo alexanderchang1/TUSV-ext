@@ -328,10 +328,11 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                     unsampled_sv_idx_list_sorted.append(i)
             sampled_sv_idx_list_sorted = np.array(sampled_sv_idx_list_sorted)
             unsampled_sv_idx_list_sorted = np.array(unsampled_sv_idx_list_sorted)
-            print(G)
+            print("G", G)
             G_sampled = G[sampled_sv_idx_list_sorted,:][:, sampled_sv_idx_list_sorted]
             G_unsampled = G[unsampled_sv_idx_list_sorted,:][:, unsampled_sv_idx_list_sorted]
-            print("G", G_sampled)
+            print("G_sampled", G_sampled)
+            print("G_unsampled", G_unsampled)
             sampled_snv_idx_list_sorted = []
             sampled_list = np.random.choice(a=len(SNV_idx_dict), size=const - len(sampled_sv_idx_list_sorted), replace=False)
             unsampled_snv_idx_list_sorted = []
