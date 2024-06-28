@@ -14,9 +14,9 @@ import multiprocessing as mp
 
 from datetime import datetime
 from graphviz import Digraph
-from ete2 import Tree          # for creating phylogenetic trees for .xml output
+from ete3 import Tree          # for creating phylogenetic trees for .xml output
 from Bio import Phylo          # for creating phylogenies to export as phylo .xml files
-from cStringIO import StringIO # for converting string to file (for creating initial phylo .xml)
+from io import StringIO # for converting string to file (for creating initial phylo .xml)
 
 sys.path.insert(0, 'model/')
 sys.path.insert(0, 'help/')
@@ -74,7 +74,7 @@ def unmix(in_dir, out_dir, n, c_max, lamb1, lamb2, num_restarts, num_cd_iters, n
     m = len(F_phasing)
     l_g, r = Q.shape
     g_un = Q_unsampled.shape[0]
-    print('The num of features of F is '+str(l_g)+ ', the num of copy numbers is ' +str(r)+ ', the num of unsampled SNV is ' + str(g_un)+ '.')
+    print(('The num of features of F is '+str(l_g)+ ', the num of copy numbers is ' +str(r)+ ', the num of unsampled SNV is ' + str(g_un)+ '.'))
     if should_overide_lambdas:
 
         lamb1 = float(l_g + 2*r) / float(2*r) * float(m) / float(2 * (n-1) )/2
@@ -83,7 +83,7 @@ def unmix(in_dir, out_dir, n, c_max, lamb1, lamb2, num_restarts, num_cd_iters, n
     Us, Cs, Es, As, obj_vals, Rs, Ws, W_SVs, W_SNVs = [], [], [], [], [], [], [], [], []
     num_complete = 0
     if not multi_num_clones:
-        for i in xrange(0, num_restarts):
+        for i in range(0, num_restarts):
             U, C, E, A_, R, W, W_SV, W_SNV, obj_val, err_msg = sv.get_UCE(F_phasing, Q, G, A, H, n, c_max, lamb1, lamb2, num_cd_iters, time_limit, only_leaf)
             printnow(str(i + 1) + ' of ' + str(num_restarts) + ' random restarts complete\n')
             Us.append(U)
@@ -189,7 +189,7 @@ def W2tree(W_sv_total, W_snv_total, E):
     for i in range(len(edge_list[0])):
         parent = edge_list[0][i]
         child = edge_list[1][i]
-        if parent not in tree.keys():
+        if parent not in list(tree.keys()):
             tree[parent] = []
         tree[parent].append(child)
         mut_sv_list = list(np.where(W_sv_total[child, :] == 1))
@@ -206,8 +206,8 @@ def collapse_nodes(U, C, E, A, R, W, W_SV, W_SNV, threshold=0.0, only_leaf=False
     if not only_leaf:
         # collapse the branches with 0 length
         branch_remove_idx = []
-        for i in xrange(tree.N-1, -1, -1):
-            for j in xrange(tree.N-1, -1, -1):
+        for i in range(tree.N-1, -1, -1):
+            for j in range(tree.N-1, -1, -1):
                 if int(E[i, j]) == 1 and sum(W[j, :]) == 0 and R[i,j] == 0:
                     branch_remove_idx.append(j)
         for node in branch_remove_idx:
@@ -221,7 +221,7 @@ def collapse_nodes(U, C, E, A, R, W, W_SV, W_SNV, threshold=0.0, only_leaf=False
         # collapse the nodes with 0 frequency
         freq_remove_idx = []
         freq_leaf_remove_idx = []
-        for i in xrange(tree.N-1, -1, -1):
+        for i in range(tree.N-1, -1, -1):
             if i in branch_remove_idx:
                 continue
             if np.mean(U[:, i]) <= threshold:
@@ -242,8 +242,8 @@ def collapse_nodes(U, C, E, A, R, W, W_SV, W_SNV, threshold=0.0, only_leaf=False
     else:
         # collapse the branches with 0 length and the child of the branch doesn't belong to leaf nodes
         branch_remove_idx = []
-        for i in xrange(tree.N - 1, -1, -1):
-            for j in xrange(tree.N - 1, -1, -1):
+        for i in range(tree.N - 1, -1, -1):
+            for j in range(tree.N - 1, -1, -1):
                 if int(E[i, j]) == 1 and sum(W[j, :]) == 0 and R[i, j] == 0 and not tree.is_leaf(j):
                     branch_remove_idx.append(j)
         for node in branch_remove_idx:
@@ -257,14 +257,14 @@ def collapse_nodes(U, C, E, A, R, W, W_SV, W_SNV, threshold=0.0, only_leaf=False
         # collapse the leaf nodes with 0 frequency
         freq_remove_idx = []
         freq_leaf_remove_idx = []
-        for i in xrange(tree.N - 1, -1, -1):
+        for i in range(tree.N - 1, -1, -1):
             if i in branch_remove_idx:
                 continue
             if np.mean(U[:, i]) <= threshold and tree.is_leaf(i):
                 freq_leaf_remove_idx.append(i)
         for node in freq_leaf_remove_idx:
             tree.delete_node(node)
-        for i in xrange(tree.N - 1, -1, -1):
+        for i in range(tree.N - 1, -1, -1):
             if tree.num_children(i) == 1:
                 freq_remove_idx.append(i)
         for node in freq_remove_idx:
@@ -279,7 +279,7 @@ def collapse_nodes(U, C, E, A, R, W, W_SV, W_SNV, threshold=0.0, only_leaf=False
 
     # delete those nodes
     remove_idx = branch_remove_idx + freq_remove_idx + freq_leaf_remove_idx
-    print('Nodes ', remove_idx, 'will be collapsed.')
+    print(('Nodes ', remove_idx, 'will be collapsed.'))
     U_new = np.delete(U, remove_idx, axis=1)
     C_new = np.delete(C, remove_idx, axis=0)
     A_new = np.delete(A, remove_idx, axis=0)
@@ -291,7 +291,7 @@ def collapse_nodes(U, C, E, A, R, W, W_SV, W_SNV, threshold=0.0, only_leaf=False
     W_new = np.delete(W, remove_idx, axis=0)
     W_SV_new = np.delete(W_SV, remove_idx, axis=0)
     W_SNV_new = np.delete(W_SNV, remove_idx, axis=0)
-    print("collapse", U_new.shape, C_new.shape)
+    print(("collapse", U_new.shape, C_new.shape))
     return U_new, C_new, E_new, A_new, R_new, W_new, W_SV_new, W_SNV_new
 
 
@@ -301,11 +301,11 @@ class ModifyTree:
         self.tree = {}
         self.E = E
         self.N = len(E)
-        for i in xrange(self.N - 1, -1, -1):
-            for j in xrange(self.N - 1, -1, -1):
+        for i in range(self.N - 1, -1, -1):
+            for j in range(self.N - 1, -1, -1):
                 if int(E[i, j]) == 1:
                     self.cp_tree[j] = i
-                    if i not in self.tree.keys():
+                    if i not in list(self.tree.keys()):
                         self.tree[i] = [j]
                     else:
                         self.tree[i].append(j)
@@ -335,13 +335,13 @@ class ModifyTree:
             del self.tree[idx]
 
     def is_leaf(self, idx):
-        if idx not in self.tree.keys():
+        if idx not in list(self.tree.keys()):
             return True
         else:
             return False
 
     def is_root(self, idx):
-        if idx in self.tree.keys() and idx not in self.cp_tree.keys():
+        if idx in list(self.tree.keys()) and idx not in list(self.cp_tree.keys()):
             return True
         else:
             return False
@@ -359,11 +359,11 @@ def write_readme(dname, args, script_name = os.path.basename(__file__)):
     msg =  '    executed: ' + str(datetime.now()) + '\n'
     msg += 'command used:\n'
     msg += '\t```\n'
-    msg += '\t' + ' '.join(['python', script_name] + [ '--' + str(k) + ' ' + _arg_val_to_str(v) for k, v in args.iteritems() ]) + '\n'
+    msg += '\t' + ' '.join(['python', script_name] + [ '--' + str(k) + ' ' + _arg_val_to_str(v) for k, v in args.items() ]) + '\n'
     msg += '\t```\n'
     fm.append_to_file(readme_fname, msg)
     readme = open(dname + "parameters.txt", 'w')
-    for key, value in args.items():
+    for key, value in list(args.items()):
         readme.write(str(key) + ":" + str(value) + "\n")
     readme.close()
     return readme_fname
@@ -389,20 +389,20 @@ def randomly_remove_segments(F_phasing, Q, Q_unsampled, num_seg_subsamples):
     g_un = Q_unsampled.shape[0]
 
     bp_segs = []
-    for s in xrange(0, r):
+    for s in range(0, r):
         if sum(Q[:, s]): # segment s has a breakpoint in it
             bp_segs.append(s)
-    for s in xrange(0, r):
+    for s in range(0, r):
         if sum(Q_unsampled[:, s]): # segment s has a breakpoint in it
             bp_segs.append(s)
-    non_bp_segs = [ s for s in xrange(0, r) if s not in bp_segs ]  # all non breakpoint containing segments
+    non_bp_segs = [ s for s in range(0, r) if s not in bp_segs ]  # all non breakpoint containing segments
     num_seg_subsamples = min(num_seg_subsamples, len(non_bp_segs)) # ensure not removing more segs than we have
     if num_seg_subsamples == len(non_bp_segs):
         return F_phasing, Q, Q_unsampled, None
 
     keeps = random_subset(non_bp_segs, num_seg_subsamples) # segments to keep
     keeps = set(sorted(bp_segs + keeps))
-    drops = [ s for s in xrange(0, r) if s not in keeps ]
+    drops = [ s for s in range(0, r) if s not in keeps ]
 
     Q = np.delete(Q, drops, axis = 1) # remove columns for segments we do not keep
     Q_unsampled = np.delete(Q_unsampled, drops, axis=1)
@@ -456,22 +456,22 @@ def build_vcf_writer(F_phasing_full, C, org_indices, G, Q, bp_attr, cv_attr, met
     l_g = Q.shape[0]
     r = (l_g_2r - l_g)/2
     g = l_g - l
-    print(C[:,:].shape, g_2r)
+    print((C[:,:].shape, g_2r))
 
     if org_indices is not None: # only fill in values for segments not used if did not use some segments
         org_indices_minor = [org_indices[i] + r for i in range(len(org_indices))]
-        c_org_indices = [ i for i in xrange(0, l_g) ] + org_indices + org_indices_minor
-        print(c_org_indices, len(c_org_indices))
+        c_org_indices = [ i for i in range(0, l_g) ] + org_indices + org_indices_minor
+        print((c_org_indices, len(c_org_indices)))
         C_out = -1*np.ones((n, l_g+2*r), dtype = float) # C with segments that were removed inserted back in with avg from F_full
-        print(C_out.shape, C_out[:, c_org_indices].shape)
+        print((C_out.shape, C_out[:, c_org_indices].shape))
         C_out[:, c_org_indices] = C[:, :]           #   -1 is an indicator that this column should be omitted in validation
         C = C_out
 
     w = vh.Writer(m, n, metadata_fname)
-    bp_ids = np.array([ 'bp' + str(b+1) for b in xrange(0, l) ], dtype = STR_DTYPE)
-    for b in xrange(0, l): # force a breakpoint to not be mated with self
+    bp_ids = np.array([ 'bp' + str(b+1) for b in range(0, l) ], dtype = STR_DTYPE)
+    for b in range(0, l): # force a breakpoint to not be mated with self
         G[b, b] = 0
-    for b in xrange(0, l):
+    for b in range(0, l):
         chrm, pos, ext_left = bp_attr[b]
         rec_id = bp_ids[b]
         mate_id = bp_ids[np.where(G[b, :])[0][0]]
@@ -480,10 +480,10 @@ def build_vcf_writer(F_phasing_full, C, org_indices, G, Q, bp_attr, cv_attr, met
         if cps[0] < 0:
             cps = []
         w.add_bp(chrm, pos, ext_left, rec_id, mate_id, fs, cps)
-    snv_ids = [ 'snv' + str(s+1) for s in xrange(0, g) ]
+    snv_ids = [ 'snv' + str(s+1) for s in range(0, g) ]
 
-    cv_ids = [ 'cnv' + str(s+1) for s in xrange(0, r) ]
-    for s in xrange(0, r):
+    cv_ids = [ 'cnv' + str(s+1) for s in range(0, r) ]
+    for s in range(0, r):
         chrm, bgn, end = cv_attr[s]
         rec_id = cv_ids[s]
         fs = list(F_phasing_full[:, s + l_g])
@@ -506,7 +506,7 @@ def write_to_files(d, l_g, U, C, E, R, W, W_SV, W_SNV, W_SNV_UNSAMPLED, W_con, o
 
     if org_indices is not None:
         org_indices_minor = [org_indices[i] + r for i in range(len(org_indices))]
-        c_org_indices = [ i for i in xrange(0, l_g) ] + org_indices + org_indices_minor
+        c_org_indices = [ i for i in range(0, l_g) ] + org_indices + org_indices_minor
         C_out = -1*np.ones((n, l_g+2*r), dtype = float) # C with segments that were removed inserted back in with avg from F_full
         C_out[:, c_org_indices] = C[:, :]           #   -1 is an indicator that this column should be omitted in validation
     else:
@@ -546,8 +546,8 @@ def to_dot(E, R, W):
     N = len(E)
     dot = Digraph(format = 'png')
     dot.node(str(N-1))
-    for i in xrange(N-1, -1, -1):
-        for j in xrange(N-1, -1, -1):
+    for i in range(N-1, -1, -1):
+        for j in range(N-1, -1, -1):
             if int(E[i, j]) == 1:
                 num_breakpoints = sum(W[j, :])
                 edge_label = ' ' + str(int(R[i, j])) + '/' + str(num_breakpoints)
@@ -594,7 +594,7 @@ def write_xml(fname, E, C, l_g):
 def check_valid_input(Q, Q_unsampled, G, A, H,F_phasing_full, F_unsampled_phasing_full):  ### A and H are empty matrices
     print("check valid input")
     l_g, r = np.shape(Q)
-    print(l_g, r)
+    print((l_g, r))
     l, _ = np.shape(G)
     g = l_g - l
     m = np.shape(A)[0]
@@ -603,21 +603,21 @@ def check_valid_input(Q, Q_unsampled, G, A, H,F_phasing_full, F_unsampled_phasin
 
     G_msg = 'There is an issue with input binary matrix G (indicates which breakpoints are mates). Each breakpoint must be mated into pairs.'
     A_msg = 'There is an issue with input integer matricies A and H (indicating the number of reads mapped to each mated breakpoint and the number of total reads mapping to a breakpoint). The number of mated reads must be less or equal to the total reads and both should be non negative.'
-    print(Q[np.where(np.sum(Q, axis=1) != 1)])
+    print((Q[np.where(np.sum(Q, axis=1) != 1)]))
     sys.stdout.flush()
 
     raiseif(not np.all(np.sum(Q, 1) == 1), Q_msg)
     raiseif(not np.all(np.sum(Q_unsampled, 1) == 1), Q_unsampled_msg)
 
-    print(np.where(np.sum(G, 0) != 2), np.where(np.sum(G, 0) != 2))
+    print((np.where(np.sum(G, 0) != 2), np.where(np.sum(G, 0) != 2)))
     raiseif(not np.all(np.sum(G, 0) == 2) or not np.all(np.sum(G, 1) == 2), G_msg)
-    for i in xrange(0, l):
-        for j in xrange(0, l):
+    for i in range(0, l):
+        for j in range(0, l):
             raiseif(G[i, j] != G[j, i], G_msg)
             raiseif(i == j and G[i, j] != 1, G_msg)
 
-    for p in xrange(0, m):
-        for b in xrange(0, l):
+    for p in range(0, m):
+        for b in range(0, l):
             raiseif(A[p, b] < 0 or A[p, b] > H[p, b], A_msg)
     return Q, Q_unsampled, G, A, H, F_phasing_full, F_unsampled_phasing_full
 
