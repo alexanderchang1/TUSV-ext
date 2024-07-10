@@ -1,3 +1,5 @@
+This is the Python3 version, currently capped at Python 3.6 due to package dependencies.
+
 # TUSV-ext: Reconstructing tumor phylogenetic tree with SVs, CNVs and SNVs
 
 This tool aims to deconvolve multi-regional bulk sequencing samples based on variant calls including SVs, SNVs and CNVs and infer a comprehensive tumor phylogenetic tree.
