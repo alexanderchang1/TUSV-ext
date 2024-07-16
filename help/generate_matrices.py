@@ -11,7 +11,8 @@
 import sys      
 import os       
 import argparse 
-import vcf      
+#import vcf       # Switching to vcfpy due to better Python3 support
+import vcfpy
 import numpy as np
 import operator
 import random
@@ -37,9 +38,25 @@ def get_mats(in_dir, n, const=120, sv_ub=80):
 
     BP_sample_dict, CN_sample_dict, CN_sample_rec_dict, CN_sample_rec_dict_minor, CN_sample_rec_dict_major = dict(), dict(), dict(), dict(), dict()
     SNV_sample_dict = {}
+
+    max_sv = -1
+    for i, sample in enumerate(sampleList):
+        sv_count = 0
+        input_vcf_file = in_dir + '/' + sample
+        reader =  vcfpy.Reader.from_path(input_vcf_file)
+        for rec in reader:
+            if is_sv_record(rec):
+                sv_count += 1
+        max_sv = max(max_sv, sv_count)
+    if max_sv >= sv_ub:
+        print(f"There are more SVs in one or more samples than your SV Upperbound, increasing SV_UB to {max_sv}, and C to {max_sv+40}")
+        sv_ub = max_sv
+        const = max_sv+40
+
+
     for i, sample in enumerate(sampleList):
         input_vcf_file = in_dir + '/' + sample
-        reader = vcf.Reader(open(input_vcf_file, 'r'))
+        reader =  vcfpy.Reader.from_path(input_vcf_file)
         BP_sample_dict[sample], CN_sample_dict[sample], CN_sample_rec_dict[sample], CN_sample_rec_dict_minor[sample], CN_sample_rec_dict_major[sample], mateIDs, toTuple, SNV_sample_dict[sample] = get_sample_dict(reader)
         # prepend sample index to each breakpoint ID
         #print(sample, (BP_sample_dict[sample].items()))
@@ -119,7 +136,7 @@ def get_mats(in_dir, n, const=120, sv_ub=80):
 #         BP_idx_dict[(chrom, pos, direction)] == bp_index
 # output: chrms (list of str) chromosome for each breakpoint in order of breakpoint index
 #         poss (list of int) position on chromosome for each breakpoint in order ...
-#         oris (list of bool) True if break end extends to the left in original genome. False otherwise
+#         oris (list of bool) '+' if break end extends to the left in original genome. '-' otherwise
 def _get_bp_attr(BP_idx_dict):
     inv_BP_idx_dict = _inv_dic(BP_idx_dict) # keys are now index of breakpoints
     chrms, poss, oris, mate_idxs = [], [], [], []
@@ -328,6 +345,7 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                     unsampled_sv_idx_list_sorted.append(i)
             sampled_sv_idx_list_sorted = np.array(sampled_sv_idx_list_sorted)
             unsampled_sv_idx_list_sorted = np.array(unsampled_sv_idx_list_sorted)
+
             print(("G", G))
             G_sampled = G[sampled_sv_idx_list_sorted,:][:, sampled_sv_idx_list_sorted]
             G_unsampled = G[unsampled_sv_idx_list_sorted,:][:, unsampled_sv_idx_list_sorted]
@@ -405,10 +423,10 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                         # A[sample_idx][bp_idx] = bdp
                         # H[sample_idx][bp_idx] = dp
 
-                        if direction == False and (chrom, pos) in CN_endPos_dict:
+                        if direction == '-' and (chrom, pos) in CN_endPos_dict:
                             cn_idx = CN_endPos_dict[(chrom, pos)]
                             Q_SV[new_idx][cn_idx] = 1
-                        elif direction == True and (chrom, pos) in CN_startPos_dict:
+                        elif direction == '+' and (chrom, pos) in CN_startPos_dict:
                             cn_idx = CN_startPos_dict[(chrom, pos)]
                             Q_SV[new_idx][cn_idx] = 1
                         else: # search through all posible segments where bp could lie
@@ -424,17 +442,21 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                     else:
                         new_idx = np.where(unsampled_sv_idx_list_sorted == bp_idx)[0][0]
                     #F[sample_idx][bp_idx] = cn
-                    
+                        # print('sample_idx', sample_idx)
+                        # print('new_idx', new_idx)
+                        # print("F_SV shape:", F_SV.shape)
+                        # print("Length of unsampled_sv_idx_list_sorted:", len(unsampled_sv_idx_list_sorted))
+
                         F_SV[sample_idx][new_idx] = cn[0] if isinstance(cn, list) else cn
 
 
                         # A[sample_idx][bp_idx] = bdp
                         # H[sample_idx][bp_idx] = dp
 
-                        if direction == False and (chrom, pos) in CN_endPos_dict:
+                        if direction == '-' and (chrom, pos) in CN_endPos_dict:
                             cn_idx = CN_endPos_dict[(chrom, pos)]
                             Q_SV_unsampled[new_idx][cn_idx] = 1
-                        elif direction == True and (chrom, pos) in CN_startPos_dict:
+                        elif direction == '+' and (chrom, pos) in CN_startPos_dict:
                             cn_idx = CN_startPos_dict[(chrom, pos)]
                             Q_SV_unsampled[new_idx][cn_idx] = 1
                         else: # search through all posible segments where bp could lie
@@ -570,11 +592,11 @@ def get_BP_idx_dict(BP_sample_dict):
     for chrom in chrom_pos_dict:
         BP_patient_dict[chrom] = list()
         for pos in chrom_pos_dict[chrom]:
-            if (pos, False) in chrom_pos_dir_dict[chrom]:
-                BP_patient_dict[chrom].append((pos, False))
+            if (pos, '-') in chrom_pos_dir_dict[chrom]:
+                BP_patient_dict[chrom].append((pos, '-'))
 
-            if (pos, True) in chrom_pos_dir_dict[chrom]:
-                BP_patient_dict[chrom].append((pos, True))
+            if (pos, '+') in chrom_pos_dir_dict[chrom]:
+                BP_patient_dict[chrom].append((pos, '+'))
 
     BP_idx_dict = dict()
     idx = 0
@@ -583,8 +605,8 @@ def get_BP_idx_dict(BP_sample_dict):
         for (pos, direction) in BP_patient_dict[chrom]:
             if (chrom, pos, direction) in BP_idx_dict:
                 continue
-
-            BP_idx_dict[(chrom, pos, direction)] = idx
+            else:
+                BP_idx_dict[(chrom, pos, direction)] = idx
             #print(idx, chrom, pos)
             idx += 1
     l = idx
@@ -601,7 +623,7 @@ def _inv_dic(dic):
 # 1. BP_sample_dict: 
 #    key: sample
 #    val: {chr1:{ pos1:{dir: T/F, cn: , a: , h: }, pos2: {dir: , cn: , a:, h: }, chr2: {}, ...}
-#    mate_dir = rec.ALT[0].remoteOrientation. if mate_dir == False: ], if mate_dir == True: [
+#    mate_dir = rec.ALT[0].mate_orientation. if mate_dir == '-': ], if mate_dir == '+': [
 # 2. CN_sample_dict:
 #    key: sample
 #    value: {chr1: {pos1: s/e, pos2: s/e, ...}, chr2: {}, ... }
@@ -630,7 +652,7 @@ def get_sample_dict(reader):
                 BP_sample_dict[rec.CHROM] = dict()
             if rec.POS not in BP_sample_dict[rec.CHROM]:
                 BP_sample_dict[rec.CHROM][rec.POS] = dict()
-            bp_id = rec.ID
+            bp_id = rec.ID[0]
             if bp_id not in bp_id_set:
                 bp_id_set.add(bp_id)
             else:
@@ -640,22 +662,22 @@ def get_sample_dict(reader):
                 BP_sample_dict[rec.CHROM][rec.POS][bp_id] = {}
             else:
                 print((bp_id, 'already in set'))
-            BP_sample_dict[rec.CHROM][rec.POS][bp_id]['id'] = rec.ID
-            BP_sample_dict[rec.CHROM][rec.POS][bp_id]['cn'] = rec.samples[0].data.CNADJ
-            BP_sample_dict[rec.CHROM][rec.POS][bp_id]['mate_dir'] = rec.ALT[0].remoteOrientation
+            BP_sample_dict[rec.CHROM][rec.POS][bp_id]['id'] = rec.ID[0]
+            BP_sample_dict[rec.CHROM][rec.POS][bp_id]['cn'] = rec.calls[0].data['CNADJ']
+            BP_sample_dict[rec.CHROM][rec.POS][bp_id]['mate_dir'] = rec.ALT[0].mate_orientation
             # BP_sample_dict[rec.CHROM][rec.POS][bp_id]['mate_id'] = rec.INFO['MATEID']
-            BP_sample_dict[rec.CHROM][rec.POS][bp_id]['mate_pos'] = rec.ALT[0].pos
-            BP_sample_dict[rec.CHROM][rec.POS][bp_id]['mate_chr'] = rec.ALT[0].chr
+            BP_sample_dict[rec.CHROM][rec.POS][bp_id]['mate_pos'] = rec.ALT[0].mate_pos
+            BP_sample_dict[rec.CHROM][rec.POS][bp_id]['mate_chr'] = rec.ALT[0].mate_chrom
 
-            bp_id_to_mate_id[rec.ID] = rec.INFO['MATEID'][0]
-            bp_id_to_mate_dir[rec.ID] = rec.ALT[0].remoteOrientation
+            bp_id_to_mate_id[rec.ID[0]] = rec.INFO['MATEID'][0]
+            bp_id_to_mate_dir[rec.ID[0]] = rec.ALT[0].mate_orientation
 
-            # BP_sample_dict[rec.CHROM][rec.POS]['bdp'] = rec.samples[0].data.BDP
-            # BP_sample_dict[rec.CHROM][rec.POS]['dp'] = rec.samples[0].data.DP
+            # BP_sample_dict[rec.CHROM][rec.POS]['bdp'] = rec.calls[0].data.BDP
+            # BP_sample_dict[rec.CHROM][rec.POS]['dp'] = rec.calls[0].data.DP
 
         elif is_snv_record(rec):
             if (rec.CHROM, rec.POS) not in SNV_sample_dict:
-                SNV_sample_dict[(rec.CHROM,rec.POS)] = rec.samples[0].data.CNADJ
+                SNV_sample_dict[(rec.CHROM,rec.POS)] = rec.calls[0].data['CNADJ']
 
         elif is_cnv_record(rec):
             if rec.CHROM not in CN_sample_dict:
@@ -663,17 +685,18 @@ def get_sample_dict(reader):
                 CN_sample_rec_dict[rec.CHROM] = dict() ### xf
                 CN_sample_rec_dict_minor[rec.CHROM] = dict() ### xf
                 CN_sample_rec_dict_major[rec.CHROM] = dict() ### xf
-            #print(rec.CHROM, rec.INFO['END'],rec.samples[0].data.CN)
+            #print(rec.CHROM, rec.INFO['END'],rec.calls[0].data['CN'])
             if isinstance(rec.INFO['END'], list):
                 info_end = rec.INFO['END'][0]
             else:
                 info_end = rec.INFO['END']
             CN_sample_dict[rec.CHROM][rec.POS] = ['s']
             CN_sample_dict[rec.CHROM][info_end] = ['e']
-            CN_sample_rec_dict[rec.CHROM][(rec.POS, info_end)] = sum(rec.samples[0].data.CN)
-            CN_sample_rec_dict_minor[rec.CHROM][(rec.POS, info_end)] = rec.samples[0].data.CN[0]
-            CN_sample_rec_dict_major[rec.CHROM][(rec.POS, info_end)] = rec.samples[0].data.CN[1]
-
+            CN_sample_rec_dict[rec.CHROM][(rec.POS, info_end)] = sum(rec.calls[0].data['CN'])
+            CN_sample_rec_dict_minor[rec.CHROM][(rec.POS, info_end)] = rec.calls[0].data['CN'][0]
+            CN_sample_rec_dict_major[rec.CHROM][(rec.POS, info_end)] = rec.calls[0].data['CN'][1]
+        else:
+            raise Exception("Genomic Change of Unknown Type Found")
     count2 = 0
     for chrom in BP_sample_dict:
         for pos in BP_sample_dict[chrom]:
@@ -816,12 +839,12 @@ def get_CN_indices(CN_startPos_dict, CN_endPos_dict, chrom, s, e):
 
 
 def is_cnv_record(rec):
-    return rec.ID[0:3] == 'cnv'
+    return rec.ID[0][0:3] == 'cnv'
 
 
 def is_sv_record(rec):
-    return rec.ID[0:2] == 'sv'
+    return rec.ID[0][0:2] == 'sv'
 
 
 def is_snv_record(rec):
-    return rec.ID[0:3] == 'snv'
+    return rec.ID[0][0:3] == 'snv'
