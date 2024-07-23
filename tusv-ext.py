@@ -58,10 +58,25 @@ def unmix(in_dir, out_dir, n, c_max, lamb1, lamb2, num_restarts, num_cd_iters, n
     print("unmix")
 
     F_phasing_full, F_unsampled_phasing_full, Q_full, Q_unsampled_full, G, G_unsampled, A, H, bp_attr, cv_attr, F_info_phasing, \
-    F_unsampled_info_phasing, sampled_snv_list_sort, unsampled_snv_list_sort, sampled_sv_list_sort, unsampled_sv_list_sort = gm.get_mats(in_dir, n, const=const, sv_ub=sv_ub)
+    F_unsampled_info_phasing, sampled_snv_list_sort, unsampled_snv_list_sort, sampled_sv_list_sort, unsampled_sv_list_sort, sampleList = gm.get_mats(in_dir, n, const=const, sv_ub=sv_ub)
     Q_full, Q_unsampled_full, G, A, H, F_phasing_full, F_unsampled_phasing_full = check_valid_input(Q_full, Q_unsampled_full,G, A, H, F_phasing_full, F_unsampled_phasing_full)
 
-    np.savetxt(out_dir + "/F_info_phasing.csv", F_info_phasing, delimiter='\t', fmt='%s')
+    #np.savetxt(out_dir + "/F_info_phasing.csv", F_info_phasing, delimiter='\t', fmt='%s')
+
+    # Write F_info_phasing with more detailed information
+    with open(out_dir + "/F_info_phasing.csv", 'w') as f:
+        f.write('Feature_Index,Feature_Type,Chromosome,Position,Feature_ID\n')
+        for i, feature in enumerate(F_info_phasing):
+            if feature[2].startswith('sv'):
+                feature_type = 'SV'
+            elif feature[2].startswith('snv'):
+                feature_type = 'SNV'
+            elif feature[2].startswith('cnv'):
+                feature_type = 'CNA'
+            else:
+                feature_type = 'Unknown'
+            f.write(f'{i},{feature_type},{feature[0]},{feature[1]},{feature[2]}\n')
+
     np.savetxt(out_dir + "/F_unsampled_info_phasing.csv", F_unsampled_info_phasing, delimiter='\t', fmt='%s')
     np.savetxt(out_dir + "/sampled_snv_list_sort.csv", sampled_snv_list_sort, delimiter='\t', fmt='%d')
     np.savetxt(out_dir + "/unsampled_snv_list_sort.csv", unsampled_snv_list_sort, delimiter='\t', fmt='%d')
@@ -115,13 +130,17 @@ def unmix(in_dir, out_dir, n, c_max, lamb1, lamb2, num_restarts, num_cd_iters, n
         min_node, min_dist, W_unsampled = snv_assign(C_best[:, -2*r:], Q_unsampled, A_best, E_best, U_best, F_unsampled_phasing_full, G_unsampled)
         np.savetxt(out_dir + "/unsampled_assignment.csv", min_node, delimiter=',')
         np.savetxt(out_dir + "/unsampled_assignment_dist.csv", min_dist, delimiter=',')
+
+
         ### concatenate unsampled SV and SNV list
         W_SV_unsampled = W_unsampled[:,:len(unsampled_sv_list_sort)]
         W_SNV_unsampled = W_unsampled[:,len(unsampled_sv_list_sort):]
         W_con = concatenate_W(W_SV_best, W_SV_unsampled, W_SNV_best, W_SNV_unsampled, sampled_sv_list_sort, unsampled_sv_list_sort, sampled_snv_list_sort, unsampled_snv_list_sort)
-        writer = None #build_vcf_writer(F_phasing_full, C_best, org_indxs, G, Q, bp_attr, cv_attr, metadata_fname)
+        writer = None # @TODO: build_vcf_writer(F_phasing_full, C_best, org_indxs, G, Q, bp_attr, cv_attr, metadata_fname)
+        
         B = create_binary_matrix(W_con, A_best)
-        write_to_files(out_dir, l_g, U_best, C_best, E_best, R_best, W_best, W_SV_best, W_SNV_best, W_unsampled, W_con, obj_vals[best_i], F_phasing_full, F_unsampled_phasing_full, org_indxs, writer, E_pre, R_pre, W_pre, B, A_best)
+        write_to_files(out_dir, l_g, U_best, C_best, E_best, R_best, W_best, W_SV_best, W_SNV_best, W_unsampled, W_con, obj_vals[best_i], F_phasing_full, F_unsampled_phasing_full, org_indxs, writer, E_pre, R_pre, W_pre, B, A_best, sampleList)
+
     else:
         training_obj = np.zeros(n-1)
         for n_ in range(2, n+1):
@@ -134,18 +153,22 @@ def unmix(in_dir, out_dir, n, c_max, lamb1, lamb2, num_restarts, num_cd_iters, n
             W_pre = copy.deepcopy(W)
             if collapse:
                 U, C, E, A_, R, W, W_SV, W_SNV = collapse_nodes(U,C,E,A_,R,W,W_SV, W_SNV,threshold,only_leaf)
+                #U_best, C_best, E_best, A_best, R_best, W_best, W_SV_best, W_SNV_best = collapse_nodes(Us[best_i], Cs[best_i], Es[best_i], As[best_i], Rs[best_i], Ws[best_i], W_SVs[best_i], W_SNVs[best_i], threshold,only_leaf)
 
-            min_node, min_dist, W_SNV_unsampled = snv_assign(C[:, -2 * r:], Q_unsampled, A_, E, U,F_unsampled_phasing_full, G_unsampled)
+            min_node, min_dist, W_unsampled = snv_assign(C[:, -2 * r:], Q_unsampled, A_, E, U,F_unsampled_phasing_full, G_unsampled)
             np.savetxt(out_dir + "/unsampled_SNV_assignment.csv", min_node, delimiter=',')
             np.savetxt(out_dir + "/unsampled_SNV_assignment_dist.csv", min_dist, delimiter=',')
-            W_con, W_snv_con = concatenate_W(W_SV, W_SNV, W_SNV_unsampled, sampled_snv_list_sort,
-                                             unsampled_snv_list_sort)
+            
+            
+            W_SV_unsampled = W_unsampled[:,:len(unsampled_sv_list_sort)]
+            W_SNV_unsampled = W_unsampled[:,len(unsampled_sv_list_sort):]
+            W_con = concatenate_W(W_SV, W_SV_unsampled, W_SNV, W_SNV_unsampled, sampled_sv_list_sort, unsampled_sv_list_sort, sampled_snv_list_sort, unsampled_snv_list_sort)
             writer = build_vcf_writer(F_phasing_full, C, org_indxs, G, Q, bp_attr, cv_attr, metadata_fname)
             B = create_binary_matrix(W_con, A)
             if not os.path.exists(out_dir + '/num_clone_' + str(n_)):
                 os.mkdir(out_dir + '/num_clone_' + str(n_))
             write_to_files(out_dir + '/num_clone_' + str(n_) + '/', l_g, U, C, E, R, W, W_SV, W_SNV, W_SNV_unsampled,W_con, obj_val, F_phasing_full,
-                           F_unsampled_phasing_full, org_indxs, writer, E_pre, R_pre, W_pre, B, A_)
+                           F_unsampled_phasing_full, org_indxs, writer, E_pre, R_pre, W_pre, B, A_, sampleList)
         np.savetxt(out_dir + '/training_obj_list.csv', training_obj, delimiter='\t')
 
 def create_binary_matrix(W_con, A):
@@ -499,7 +522,7 @@ def build_vcf_writer(F_phasing_full, C, org_indices, G, Q, bp_attr, cv_attr, met
 #        F_full (np.array) [m, l+r] mixed copy number for all l bps and r segments for each sample
 #        org_indices (list of int) for each segment in F, the index of where it is found in input F_all
 #        writer (vcf_help.Writer) writer to be used to write entire .vcf file
-def write_to_files(d, l_g, U, C, E, R, W, W_SV, W_SNV, W_SNV_UNSAMPLED, W_con, obj_val, F_phasing_full, F_unsampled_phasing_full, org_indices, writer, E_pre, R_pre, W_pre, B, A):
+def write_to_files(d, l_g, U, C, E, R, W, W_SV, W_SNV, W_SNV_UNSAMPLED, W_con, obj_val, F_phasing_full, F_unsampled_phasing_full, org_indices, writer, E_pre, R_pre, W_pre, B, A, sampleList):
     l_g_2r = F_phasing_full.shape[1]
     r = (l_g_2r - l_g)/2
     n, _ = C.shape
@@ -515,8 +538,26 @@ def write_to_files(d, l_g, U, C, E, R, W, W_SV, W_SNV, W_SNV_UNSAMPLED, W_con, o
     fnames = [ d + fname for fname in ['U.tsv', 'C.tsv', 'T.dot', 'F.tsv',  'W.tsv', 'obj_val.txt', 'unmixed.vcf', 'unmixed.xml','F_phasing_full.tsv','F_unsampled_phasing_full.tsv', 'W_SV.tsv', 'W_SNV_sampled.tsv', 'W_SNV_unsampled.tsv', 'W_CONCATENATE.tsv', 'T_pre.dot', 'B.tsv', 'A.tsv'] ]
     for fname in fnames:
         fm.touch(fname)
-    np.savetxt(fnames[0], U, delimiter = '\t', fmt = '%.8f')
-    np.savetxt(fnames[1], C_out, delimiter = '\t', fmt = '%.8f')
+
+
+    # Modified part for writing U matrix
+    with open(fnames[0], 'w') as f:
+        # Write header
+        f.write('Sample\t' + '\t'.join([f'Clone_{i}' for i in range(U.shape[1])]) + '\n')
+        
+        # Write data
+        for i, sample in enumerate(sampleList):
+            f.write(f'{sample}\t' + '\t'.join([f'{val:.8f}' for val in U[i,:]]) + '\n')
+
+
+
+    # Write C matrix
+    with open(fnames[1], 'w') as f:
+        f.write('Clone\t' + '\t'.join([f'Feature_{i+1}' for i in range(C_out.shape[1])]) + '\n')
+        for i in range(C_out.shape[0]):
+            f.write(f'Clone_{i+1}\t' + '\t'.join([f'{val:.8f}' for val in C_out[i,:]]) + '\n')
+
+
     np.savetxt(fnames[4], W, delimiter = '\t', fmt = '%d')
     np.savetxt(fnames[10], W_SV, delimiter='\t', fmt='%d')
     np.savetxt(fnames[11], W_SNV, delimiter='\t', fmt='%d')
@@ -606,8 +647,12 @@ def check_valid_input(Q, Q_unsampled, G, A, H,F_phasing_full, F_unsampled_phasin
     print((Q[np.where(np.sum(Q, axis=1) != 1)]))
     sys.stdout.flush()
 
-    raiseif(not np.all(np.sum(Q, 1) == 1), Q_msg)
-    raiseif(not np.all(np.sum(Q_unsampled, 1) == 1), Q_unsampled_msg)
+
+    raiseif(not np.all(np.sum(Q, axis=1) == 1), Q_msg)
+    if Q_unsampled is not None and Q_unsampled.size > 0:
+        raiseif(not np.all(np.sum(Q_unsampled, axis=1) == 1), Q_unsampled_msg)
+    else:
+        print("Warning: Q_unsampled is empty or None")
 
     print((np.where(np.sum(G, 0) != 2), np.where(np.sum(G, 0) != 2)))
     raiseif(not np.all(np.sum(G, 0) == 2) or not np.all(np.sum(G, 1) == 2), G_msg)
