@@ -39,19 +39,30 @@ def get_mats(in_dir, n, const=120, sv_ub=80):
     BP_sample_dict, CN_sample_dict, CN_sample_rec_dict, CN_sample_rec_dict_minor, CN_sample_rec_dict_major = dict(), dict(), dict(), dict(), dict()
     SNV_sample_dict = {}
 
-    max_sv = -1
-    for i, sample in enumerate(sampleList):
-        sv_count = 0
-        input_vcf_file = in_dir + '/' + sample
-        reader =  vcfpy.Reader.from_path(input_vcf_file)
-        for rec in reader:
-            if is_sv_record(rec):
-                sv_count += 1
-        max_sv = max(max_sv, sv_count)
-    if max_sv >= sv_ub:
-        print(f"There are more SVs in one or more samples than your SV Upperbound, increasing SV_UB to {max_sv}, and C to {max_sv+40}")
-        sv_ub = max_sv
-        const = max_sv+40
+    # Commenting this out for now to deal with the SNV_assignment error fix
+
+    # max_cnv = -1
+    # max_sv = -1
+    # for i, sample in enumerate(sampleList):
+    #     sv_count = 0
+    #     cnv_count = 0
+
+
+    #     input_vcf_file = in_dir + '/' + sample
+    #     reader =  vcfpy.Reader.from_path(input_vcf_file)
+    #     for rec in reader:
+    #         if is_sv_record(rec):
+    #             sv_count += 1
+    #         elif is_cnv_record(rec):
+    #             cnv_count += 1
+    #     max_sv = max(max_sv, sv_count)
+    #     max_cnv = max(max_cnv, cnv_count)
+    # if max_sv >= sv_ub:
+    #     print(f"There are more SVs in one or more samples than your SV Upperbound, increasing SV_UB to {max_sv}")
+    #     sv_ub = max_sv
+    # if max_cnv > const:
+    #     print(f"There are more CNVs in one or more samples than your Const, increasing Const to {max_cnv}")
+    #     const = max_cnv
 
 
     for i, sample in enumerate(sampleList):
@@ -129,7 +140,7 @@ def get_mats(in_dir, n, const=120, sv_ub=80):
     print((l, g, r))
     A = A[0:m, 0:l] #empty matrix
     H = H[0:m, 0:l]
-    return F_phasing, F_unsampled_phasing, Q, Q_unsampled, G, G_unsampled, A, H, bp_attr, cv_attr, F_info_phasing, F_unsampled_info_phasing, sampled_snv_list_sort, unsampled_snv_list_sort, sampled_sv_list_sort, unsampled_sv_list_sort
+    return F_phasing, F_unsampled_phasing, Q, Q_unsampled, G, G_unsampled, A, H, bp_attr, cv_attr, F_info_phasing, F_unsampled_info_phasing, sampled_snv_list_sort, unsampled_snv_list_sort, sampled_sv_list_sort, unsampled_sv_list_sort, sampleList
 
 
 #  input: bp_id_to_mate_id
@@ -170,12 +181,13 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
 
     print("make matrices")
     if sv_ub < 0:
+        print("sv_ub < 0")
         sampled_sv_idx_list_sorted = np.arange(len(BP_idx_dict))
         unsampled_sv_idx_list_sorted = np.array([])
         G_sampled=G
         G_unsampled=None
         if l + g <= const:
-            print('yes')
+            print("l + g <= const")
             F_phasing, Q, A, H = np.zeros((m, l + g + 2 * r)), np.zeros((l + g, r)), \
                                  np.zeros((m, l)), np.zeros((m, l))
             F_unsampled_phasing, Q_unsampled = None, None
@@ -197,6 +209,7 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
             sampled_snv_idx_list_sorted = np.arange(len(SNV_idx_dict))
             unsampled_snv_idx_list_sorted = np.array([])
         elif l <= const:
+            print("l <= const")
             F_phasing, F_unsampled_phasing, Q, Q_unsampled, A, H = np.zeros((m, const + 2 * r)), np.zeros((m, l + g - const)), \
             np.zeros((const, r)), np.zeros((l + g - const, r)), np.zeros((m, l)), np.zeros((m, l))
             F_info_phasing, F_unsampled_info_phasing = make_2d_list(const + 2 * r, 3), make_2d_list(l + g - const, 3)
@@ -223,6 +236,7 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
             unsampled_snv_idx_list_sorted = np.array(unsampled_snv_idx_list_sorted)
 
         elif l > const:
+            print("l > const")
             F_phasing, F_unsampled_phasing, Q, Q_unsampled, A, H = np.zeros((m, l + 2 * r)), np.zeros((m, g)), np.zeros(
                 (l, r)), np.zeros((g, r)), np.zeros((m, l)), np.zeros((m, l))
             F_info_phasing, F_unsampled_info_phasing = make_2d_list(l + 2 * r, 3), make_2d_list(g, 3)
@@ -248,6 +262,7 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
     else:
         assert sv_ub <= const
         if l <= sv_ub and l + g <= const:
+            print("l <= sv_ub and l + g <= const")
             F_phasing, Q, A, H = np.zeros((m, l + g + 2 * r)), np.zeros((l + g,r)), \
                                     np.zeros((m, l)), np.zeros((m, l))
             F_unsampled_phasing, Q_unsampled = None, None
@@ -270,6 +285,7 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
             sampled_snv_idx_list_sorted = np.arange(len(SNV_idx_dict))
             unsampled_snv_idx_list_sorted = np.array([])
         elif l <= sv_ub and l + g > const:
+            print("l <= sv_ub and l + g > const")
             F_phasing, F_unsampled_phasing, Q, Q_unsampled, A, H = np.zeros((m, const + 2 * r)), np.zeros((m, l + g - const )), \
                 np.zeros((const, r)), np.zeros((l + g - const, r)), np.zeros((m, l)), np.zeros((m, l))
             F_info_phasing, F_unsampled_info_phasing = make_2d_list(const + 2 * r, 3), make_2d_list(l + g - const, 3)
@@ -300,11 +316,24 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
             unsampled_sv_idx_list_sorted = np.array([])
 
         elif l > sv_ub and l + g > const:
+            print("l > sv_ub and l + g > const")
+
+            
             F_phasing, F_unsampled_phasing, Q, Q_unsampled, A, H =  np.zeros((m, const + 2 * r)), np.zeros((m, l+g-const)), np.zeros((const, r)), \
                         np.zeros((l+g-const, r)), np.zeros((m, sv_ub)), np.zeros((m, sv_ub))
             F_info_phasing, F_unsampled_info_phasing = make_2d_list(const + 2 * r, 3), make_2d_list(l + g - const, 3)
 
 
+            # sampled_sv_idx_list_single = np.random.choice(a=len(BP_idx_dict), size=sv_ub // 2, replace=False)
+            # sampled_sv_idx_list_paired = np.where(G[sampled_sv_idx_list_single] == 1)[1]
+            # sampled_sv_idx_list_paired = np.array(list(set(list(sampled_sv_idx_list_paired))))
+            # while True:
+            #     if len(sampled_sv_idx_list_paired) < sv_ub:
+            #         sampled_sv_idx_list_single = np.append(sampled_sv_idx_list_single, np.random.choice(a=len(BP_idx_dict), size=(sv_ub - len(sampled_sv_idx_list_paired)) // 2, replace=False))
+            #         sampled_sv_idx_list_paired = np.where(G[sampled_sv_idx_list_single] == 1)[1]
+            #         sampled_sv_idx_list_paired = np.array(list(set(list(sampled_sv_idx_list_paired))))
+            #     else:
+            #         break
             sampled_sv_idx_list_single = np.random.choice(a=len(BP_idx_dict), size=sv_ub // 2, replace=False)
             sampled_sv_idx_list_paired = np.where(G[sampled_sv_idx_list_single] == 1)[1]
             sampled_sv_idx_list_paired = np.array(list(set(list(sampled_sv_idx_list_paired))))
@@ -316,6 +345,14 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                 else:
                     break
 
+            # sampled_sv_num = len(sampled_sv_idx_list_paired)
+            # F_SV = F_phasing[:,:sampled_sv_num]
+            # F_SV_info = F_info_phasing[:sampled_sv_num]
+            # Q_SV = Q[:sampled_sv_num]
+            # F_SV_unsampled = F_unsampled_phasing[:, :(l-sampled_sv_num)]
+            # F_SV_unsampled_info = F_unsampled_info_phasing[:(l-sampled_sv_num)]
+            # Q_SV_unsampled = Q_unsampled[:(l-sampled_sv_num)]
+
             sampled_sv_num = len(sampled_sv_idx_list_paired)
             F_SV = F_phasing[:,:sampled_sv_num]
             F_SV_info = F_info_phasing[:sampled_sv_num]
@@ -323,12 +360,23 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
             F_SV_unsampled = F_unsampled_phasing[:, :(l-sampled_sv_num)]
             F_SV_unsampled_info = F_unsampled_info_phasing[:(l-sampled_sv_num)]
             Q_SV_unsampled = Q_unsampled[:(l-sampled_sv_num)]
+
+
+            # F_SNV = F_phasing[:, sampled_sv_num:const]
+            # F_SNV_info = F_info_phasing[sampled_sv_num:const]
+            # Q_SNV = Q[sampled_sv_num:]
+            # F_SNV_unsampled = F_unsampled_phasing[:, (l-sampled_sv_num):]
+            # F_SNV_unsampled_info = F_unsampled_info_phasing[(l-sampled_sv_num):]
+            # Q_SNV_unsampled = Q_unsampled[(l-sampled_sv_num) : ]
+
             F_SNV = F_phasing[:, sampled_sv_num:const]
             F_SNV_info = F_info_phasing[sampled_sv_num:const]
             Q_SNV = Q[sampled_sv_num:]
             F_SNV_unsampled = F_unsampled_phasing[:, (l-sampled_sv_num):]
             F_SNV_unsampled_info = F_unsampled_info_phasing[(l-sampled_sv_num):]
             Q_SNV_unsampled = Q_unsampled[(l-sampled_sv_num) : ]
+
+
             F_CNV = F_phasing[:,const:]
             F_CNV_info = F_info_phasing[const:]
             # for (chrom, pos), snv_idx in SNV_idx_dict.items():
@@ -489,7 +537,10 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                         pos) + " is not found in copy number info."))
             else:
                 new_idx = np.where(unsampled_snv_idx_list_sorted == snv_idx)[0][0]
+
                 F_SNV_unsampled[sample_idx][new_idx] = cn[0] if isinstance(cn, list) else cn
+
+
                 if chrom in list(seg_dic.keys()):
                     cn_idx = _get_seg_idx(seg_dic[chrom], pos)
                     if cn_idx != None:
