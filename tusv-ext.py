@@ -59,6 +59,7 @@ def unmix(in_dir, out_dir, n, c_max, lamb1, lamb2, num_restarts, num_cd_iters, n
 
     F_phasing_full, F_unsampled_phasing_full, Q_full, Q_unsampled_full, G, G_unsampled, A, H, bp_attr, cv_attr, F_info_phasing, \
     F_unsampled_info_phasing, sampled_snv_list_sort, unsampled_snv_list_sort, sampled_sv_list_sort, unsampled_sv_list_sort, sampleList = gm.get_mats(in_dir, n, const=const, sv_ub=sv_ub)
+    
     Q_full, Q_unsampled_full, G, A, H, F_phasing_full, F_unsampled_phasing_full = check_valid_input(Q_full, Q_unsampled_full,G, A, H, F_phasing_full, F_unsampled_phasing_full)
 
     #np.savetxt(out_dir + "/F_info_phasing.csv", F_info_phasing, delimiter='\t', fmt='%s')
@@ -127,14 +128,22 @@ def unmix(in_dir, out_dir, n, c_max, lamb1, lamb2, num_restarts, num_cd_iters, n
             U_best, C_best, E_best, A_best, R_best, W_best, W_SV_best, W_SNV_best = collapse_nodes(Us[best_i], Cs[best_i], Es[best_i], As[best_i], Rs[best_i], Ws[best_i], W_SVs[best_i], W_SNVs[best_i], threshold,only_leaf)
         else:
             U_best, C_best, E_best, A_best, R_best, W_best, W_SV_best, W_SNV_best = Us[best_i], Cs[best_i], Es[best_i], As[best_i], Rs[best_i], Ws[best_i], W_SVs[best_i], W_SNVs[best_i]
+        
+        # At this time there is no sv_assign or assignment of SVs that are not sampled
         min_node, min_dist, W_unsampled = snv_assign(C_best[:, -2*r:], Q_unsampled, A_best, E_best, U_best, F_unsampled_phasing_full, G_unsampled)
+        
         np.savetxt(out_dir + "/unsampled_assignment.csv", min_node, delimiter=',')
         np.savetxt(out_dir + "/unsampled_assignment_dist.csv", min_dist, delimiter=',')
 
+        print("unsampled_sv_list_sort length", len(unsampled_sv_list_sort))
+        print("unsampled_sv_list_sort length", len(unsampled_snv_list_sort))
 
+        print('W_SNV_unsampled.shape before cutdown',W_SNV_unsampled.shape)
         ### concatenate unsampled SV and SNV list
         W_SV_unsampled = W_unsampled[:,:len(unsampled_sv_list_sort)]
-        W_SNV_unsampled = W_unsampled[:,len(unsampled_sv_list_sort):]
+        W_SNV_unsampled = W_unsampled[:,len(unsampled_snv_list_sort):]
+        print('W_SNV_unsampled.shape after cutdown',W_SNV_unsampled.shape)
+
         W_con = concatenate_W(W_SV_best, W_SV_unsampled, W_SNV_best, W_SNV_unsampled, sampled_sv_list_sort, unsampled_sv_list_sort, sampled_snv_list_sort, unsampled_snv_list_sort)
         writer = None # @TODO: build_vcf_writer(F_phasing_full, C_best, org_indxs, G, Q, bp_attr, cv_attr, metadata_fname)
         
@@ -144,6 +153,7 @@ def unmix(in_dir, out_dir, n, c_max, lamb1, lamb2, num_restarts, num_cd_iters, n
     else:
         training_obj = np.zeros(n-1)
         for n_ in range(2, n+1):
+            print("Now testing n value: ", n_)
             U, C, E, A_, R, W, W_SV, W_SNV, obj_val, err_msg = sv.get_UCE(F_phasing, Q, G, A, H, n_, c_max, lamb1,
                                                                               lamb2, num_cd_iters, time_limit, only_leaf)
             printnow(str(n_) + ' of ' + str(num_restarts) + ' num of clones restarts complete\n')
@@ -153,17 +163,29 @@ def unmix(in_dir, out_dir, n, c_max, lamb1, lamb2, num_restarts, num_cd_iters, n
             W_pre = copy.deepcopy(W)
             if collapse:
                 U, C, E, A_, R, W, W_SV, W_SNV = collapse_nodes(U,C,E,A_,R,W,W_SV, W_SNV,threshold,only_leaf)
-                #U_best, C_best, E_best, A_best, R_best, W_best, W_SV_best, W_SNV_best = collapse_nodes(Us[best_i], Cs[best_i], Es[best_i], As[best_i], Rs[best_i], Ws[best_i], W_SVs[best_i], W_SNVs[best_i], threshold,only_leaf)
 
-            min_node, min_dist, W_unsampled = snv_assign(C[:, -2 * r:], Q_unsampled, A_, E, U,F_unsampled_phasing_full, G_unsampled)
+
+            # At this time there is no sv_assign or assignment of SVs that are not sampled
+            min_node, min_dist, W_unsampled = snv_assign(C[:, -2 * r:], Q_unsampled, A_, E, U, F_unsampled_phasing_full, G_unsampled)
+
+
             np.savetxt(out_dir + "/unsampled_SNV_assignment.csv", min_node, delimiter=',')
             np.savetxt(out_dir + "/unsampled_SNV_assignment_dist.csv", min_dist, delimiter=',')
             
-            
+            print("unsampled_sv_list_sort length", len(unsampled_sv_list_sort))
+            print("unsampled_sv_list_sort length", len(unsampled_snv_list_sort))
+
             W_SV_unsampled = W_unsampled[:,:len(unsampled_sv_list_sort)]
+            print('W_SNV_unsampled.shape before cutdown',W_unsampled.shape)
             W_SNV_unsampled = W_unsampled[:,len(unsampled_sv_list_sort):]
+            print('W_SNV_unsampled.shape after cutdown',W_SNV_unsampled.shape)
+
+
+            # W_SNV
             W_con = concatenate_W(W_SV, W_SV_unsampled, W_SNV, W_SNV_unsampled, sampled_sv_list_sort, unsampled_sv_list_sort, sampled_snv_list_sort, unsampled_snv_list_sort)
-            writer = build_vcf_writer(F_phasing_full, C, org_indxs, G, Q, bp_attr, cv_attr, metadata_fname)
+
+
+            writer = None #build_vcf_writer(F_phasing_full, C, org_indxs, G, Q, bp_attr, cv_attr, metadata_fname) #Unclear what this is for
             B = create_binary_matrix(W_con, A)
             if not os.path.exists(out_dir + '/num_clone_' + str(n_)):
                 os.mkdir(out_dir + '/num_clone_' + str(n_))
@@ -183,22 +205,49 @@ def create_binary_matrix(W_con, A):
 
 # concatenating W matrix for SVs and SNVs
 def concatenate_W(W_SV_TUSV, W_SV_MATCHING, W_SNV_TUSV, W_SNV_MATCHING, sampled_sv_list_sort, unsampled_sv_list_sort, sampled_snv_list_sort, unsampled_snv_list_sort):
+    """
+    W_SNV_MATCHING is the unsampled SNVs that weren't used in W_SNV but now have to be put back. 
+    _MATCHING in general means the unsamples SVs or SNVs
+    """
     n, l_sampled = W_SV_TUSV.shape
     l_unsampled = W_SV_MATCHING.shape[1]
     l = l_sampled + l_unsampled
+    print('W_SV_TUSV.shape', W_SV_TUSV.shape)
+    print('W_SV_MATCHING.shape', W_SV_MATCHING.shape)
+    print('W_SNV_TUSV.shape',W_SNV_TUSV.shape)
+    print('W_SNV_MATCHING.shape',W_SNV_MATCHING.shape)
+
+
     g_sampled = W_SNV_TUSV.shape[1]
+    print('g_sampled', g_sampled)
     g_unsampled = W_SNV_MATCHING.shape[1]
+    print('g_unsampled', g_unsampled)
+
+
     g = g_sampled + g_unsampled
+
+    assert g_sampled == len(sampled_snv_list_sort)
+    assert g_unsampled == len(unsampled_snv_list_sort)
+    print('g', g)
     W_con = np.zeros((n, l + g))
-    W_snv_con = np.zeros((n, g))
+
+    # W_snv_con = np.zeros((n, g))
+    W_snv_con = np.zeros((n, len(sampled_snv_list_sort) + len(unsampled_snv_list_sort)))
+
+
+    print('sampled_snv_list_sort', len(sampled_snv_list_sort))
+    print('unsampled_snv_list_sort', len(unsampled_snv_list_sort))
+    print('max index in sampled_sv_list_sort', max(sampled_sv_list_sort))
+    print('max index in unsampled_sv_list_sort', max(unsampled_sv_list_sort))
     if l_unsampled != 0:
         W_con[:, sampled_sv_list_sort] = W_SV_TUSV
-        W_con[:, unsampled_sv_list_sort] = W_SV_MATCHING
+        W_con[:, unsampled_sv_list_sort] = W_SV_MATCHING 
     else:
         W_con[:, :l]= W_SV_TUSV
     if g_sampled != 0:
+        print('g_sampled: ', g_sampled)
         W_snv_con[:, sampled_snv_list_sort] = W_SNV_TUSV
-        W_snv_con[:, unsampled_snv_list_sort] = W_SNV_MATCHING
+        W_snv_con[:, unsampled_snv_list_sort] = W_SNV_MATCHING # The error is coming specifically from this line, unsampled_snv_list_sort is longer than it should be.
     else:
         W_snv_con = W_SNV_MATCHING
     W_con[:, l:] = W_snv_con
@@ -696,8 +745,8 @@ def set_non_dir_args(parser):
     parser.add_argument('-s', '--num_subsamples', type = int, default = None, help = 'number of segments (in addition to those containing breakpoints) that are to be randomly kept for deconvolution. default keeps all segments.')
     parser.add_argument('-d', '--metadata_file', default = METADATA_FNAME, type = lambda x: fm.is_valid_file(parser, x), help = 'file containing metadata information for output .vcf file')
     parser.add_argument('-b', '--overide_lambdas', action = 'store_true', help = 'specify this argument if you would like the parameters lambda1 and lambda2 to be set proportional to the input data set')
-    parser.add_argument('-C', '--constant', default = 120, type = int, help = 'scaling constant for sampling SNVs')
-    parser.add_argument('-sv_ub', '--sv_upperbound', default = -1, type = int, help = 'scaling constant for sampling SVs')
+    parser.add_argument('-C', '--constant', default = 120, type = int, help = 'max constant for sampling SNVs')
+    parser.add_argument('-sv_ub', '--sv_upperbound', default = -1, type = int, help = 'max constant for sampling SVs')
     parser.add_argument('-leaf', '--only_leaf', action = 'store_true', help = 'if only deconvolute for leaves')
     parser.add_argument('-col', '--collapse', action='store_true', help='if collapse nodes')
     parser.add_argument('-th', '--threshold', default = 0.0, type = lambda x: fm.valid_float_above(parser, x, 0.0), help = 'mean frequency threshold to collapsing')

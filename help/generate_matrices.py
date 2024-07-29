@@ -78,6 +78,7 @@ def get_mats(in_dir, n, const=120, sv_ub=80):
     BP_idx_dict, l = get_BP_idx_dict(BP_sample_dict)
     G = make_G(BP_idx_dict, bp_id_to_mate_id, bp_id_to_tuple)
     CN_startPos_dict, CN_endPos_dict, r = get_CN_indices_dict(CN_sample_dict)
+    # 
     #print(CN_startPos_dict, CN_endPos_dict)
     SNV_idx_dict, g = get_snv_idx_dict(SNV_sample_dict)
     print(g)
@@ -86,24 +87,21 @@ def get_mats(in_dir, n, const=120, sv_ub=80):
     unsampled_snv_list_sort, sampled_sv_list_sort, unsampled_sv_list_sort \
         = make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict, SNV_sample_dict, SNV_idx_dict, CN_sample_rec_dict, CN_sample_rec_dict_minor, CN_sample_rec_dict_major, CN_startPos_dict, CN_endPos_dict, const=const, sv_ub=sv_ub)
     bp_attr = _inv_dic(BP_idx_dict)
-
+    
     F_phasing = np.array(F_phasing).astype(float)
     F_unsampled_phasing = np.array(F_unsampled_phasing).astype(float)
     F_info_phasing = np.array(F_info_phasing)
     F_unsampled_info_phasing = np.array(F_unsampled_info_phasing)
-    Q = np.array(Q)
+    Q = np.array(Q) # This would be more accurately Q_sampled
     Q_unsampled = np.array(Q_unsampled)
 
-
     abnormal_idx = np.where(np.sum(Q, 1) == 0)[0]
-    print(("The mutations at ", abnormal_idx, " will be removed due to non-existing bp in CNV"))
+    print(("The mutations at ", abnormal_idx, " will be removed due to non-existing bp in CNV")) #passes
 
 
     #F = np.delete(F, abnormal_idx, axis=1)
     F_phasing = np.delete(F_phasing, abnormal_idx, axis=1)
     F_info_phasing = np.delete(F_info_phasing, abnormal_idx, axis=0)
-
-
 
     Q = np.delete(Q, abnormal_idx, axis=0)
     G = np.delete(G, abnormal_idx, axis=0)
@@ -116,7 +114,7 @@ def get_mats(in_dir, n, const=120, sv_ub=80):
     abnormal_idx2 = np.where(np.sum(G, 0) != 2)[0]
     #print(np.where(np.sum(G, 1) != 2))
 
-    print(("The mutations at ", abnormal_idx2, " will be removed due to non-paired breakpoints"))
+    print(("The mutations at ", abnormal_idx2, " will be removed due to non-paired breakpoints")) #passes
     # F = np.delete(F, abnormal_idx2, axis=1)
     F_phasing = np.delete(F_phasing, abnormal_idx2, axis=1)
     F_info_phasing = np.delete(F_info_phasing, abnormal_idx2, axis=0)
@@ -124,7 +122,7 @@ def get_mats(in_dir, n, const=120, sv_ub=80):
     G = np.delete(G, abnormal_idx2, axis=0)
     G = np.delete(G, abnormal_idx2, axis=1)
     abnormal_idx22 = np.where(np.sum(G, 1) != 2)[0]
-    print(("The mutations at ", abnormal_idx22, " will be removed due to non-paired breakpoints"))
+    print(("The mutations at ", abnormal_idx22, " will be removed due to non-paired breakpoints")) #passes
     # F = np.delete(F, abnormal_idx2, axis=1)
     F_phasing = np.delete(F_phasing, abnormal_idx22, axis=1)
     F_info_phasing = np.delete(F_info_phasing, abnormal_idx22, axis=0)
@@ -132,25 +130,33 @@ def get_mats(in_dir, n, const=120, sv_ub=80):
     G = np.delete(G, abnormal_idx22, axis=0)
     G = np.delete(G, abnormal_idx22, axis=1)
 
-    
+    # Here's where it goes screwy
 
-    abnormal_idx_unsampled = np.where(np.sum(Q_unsampled, 1) == 0)[0]
-    print(("The mutations at ", abnormal_idx_unsampled, " will be removed due to non-existing position for unsampled SNVs in CNV"))
+    print('Q_unsampled', Q_unsampled) # More specifically then, this should only be Q_SNV_Unsampled if it only cares about SNVs but then later when saving it expects a W of both unsampled.
+    abnormal_idx_unsampled = np.where(np.sum(Q_unsampled, 1) == 0)[0] # It's looking for indices where Q_unsampled did not have a single assignment. 
 
-    
+
+    # These positions exist in the CNV chart, so it's more likely that they aren't being correctly scanned in the generation of Q_unsampled in the make_mats function
+    print(("The mutations at ", abnormal_idx_unsampled, " will be removed due to non-existing position for unsampled SVs and SNVs in CNV"))
+
     # F = np.delete(F, abnormal_idx, axis=1)
     F_unsampled_phasing = np.delete(F_unsampled_phasing, abnormal_idx_unsampled, axis=1)
     F_unsampled_info_phasing = np.delete(F_unsampled_info_phasing, abnormal_idx_unsampled, axis=0)
     
-    # Added these lines due a missing Q errpr:
+    # Added these lines due a missing Q error:
     Q_unsampled = np.delete(Q_unsampled, abnormal_idx_unsampled, axis=0)
+    unsampled_snv_list_sort = np.delete(unsampled_snv_list_sort, abnormal_idx_unsampled)
+    # Recalculate indices for remaining unsampled SNVs
+    new_indices = np.arange(len(unsampled_snv_list_sort))
+    unsampled_snv_list_sort = new_indices
+
 
     assert np.all(np.sum(Q_unsampled, axis=1) == 1), "Error: Not all rows in Q_unsampled sum to 1 after deletion"
 
     l_g, r = Q.shape
     l, _ = G.shape
     g = l_g - l
-    print((l, g, r))
+    print((l, g, r)) # 326 segments, R is the number of CN segments
     A = A[0:m, 0:l] #empty matrix
     H = H[0:m, 0:l]
     return F_phasing, F_unsampled_phasing, Q, Q_unsampled, G, G_unsampled, A, H, bp_attr, cv_attr, F_info_phasing, F_unsampled_info_phasing, sampled_snv_list_sort, unsampled_snv_list_sort, sampled_sv_list_sort, unsampled_sv_list_sort, sampleList
@@ -191,6 +197,11 @@ def make_3d_list(r,c,d):
 # output: cv_attr (dict) key (int) is segment index. val is tuple (chrm (str), bgn_pos (int), end_pos (int))
 def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SNV_sample_dict, SNV_idx_dict, CN_sample_rec_dict, \
                   CN_sample_rec_dict_minor, CN_sample_rec_dict_major, CN_startPos_dict, CN_endPos_dict, const=120, sv_ub=80):
+    """
+    m : length of the sample list
+    l : number of SVs
+    n : number of leaves
+    """
 
     print("Making Matrices")
 
@@ -334,10 +345,10 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
             sampled_sv_idx_list_sorted = np.arange(len(BP_idx_dict))
             unsampled_sv_idx_list_sorted = np.array([])
 
-        elif l > sv_ub and l + g > const:
+        elif l > sv_ub and l + g > const: # g is number of SNVs
             print("l > sv_ub and l + g > const")
 
-
+            #initialization of various structures needed
             F_phasing, F_unsampled_phasing, Q, Q_unsampled, A, H =  np.zeros((m, const + 2 * r)), np.zeros((m, l+g-const)), np.zeros((const, r)), \
                         np.zeros((l+g-const, r)), np.zeros((m, sv_ub)), np.zeros((m, sv_ub))
             F_info_phasing, F_unsampled_info_phasing = make_2d_list(const + 2 * r, 3), make_2d_list(l + g - const, 3)
@@ -345,6 +356,8 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
             sampled_sv_idx_list_single = np.random.choice(a=min(len(BP_idx_dict), sv_ub), size=min(sv_ub, len(BP_idx_dict)) // 2, replace=False)
             sampled_sv_idx_list_paired = np.where(G[sampled_sv_idx_list_single] == 1)[1]
             sampled_sv_idx_list_paired = np.array(list(set(list(sampled_sv_idx_list_paired))))
+
+
             while True:
                 if len(sampled_sv_idx_list_paired) < min(sv_ub, len(BP_idx_dict)):
                     remaining = min(sv_ub, len(BP_idx_dict)) - len(sampled_sv_idx_list_paired)
@@ -356,52 +369,55 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                     break
 
             sampled_sv_idx_list_paired = sampled_sv_idx_list_paired[:sv_ub]  # Ensure we don't exceed sv_ub
+            sampled_sv_num = len(sampled_sv_idx_list_paired) # 80
 
-            sampled_sv_num = len(sampled_sv_idx_list_paired)
-            F_SV = F_phasing[:, :sampled_sv_num]
+            assert sampled_sv_num == sv_ub
+
+            # Determine unsampled SVs
+            unsampled_sv_idx_list_sorted = np.array([i for i in range(len(BP_idx_dict)) if i not in sampled_sv_idx_list_paired])
+
+
+            print('Q shape', Q.shape) # Should be C x l (Max constant by total SVs) 
+
+            F_SV = F_phasing[:, :sampled_sv_num] 
             F_SV_info = F_info_phasing[:sampled_sv_num]
             Q_SV = Q[:sampled_sv_num]
-            F_SV_unsampled = F_unsampled_phasing[:, :max(0, l - sampled_sv_num)]
-            F_SV_unsampled_info = F_unsampled_info_phasing[:max(0, l - sampled_sv_num)]
-            Q_SV_unsampled = Q_unsampled[:max(0, l - sampled_sv_num)]
+
+            F_SV_unsampled = F_unsampled_phasing[:, :l-sampled_sv_num]
+            F_SV_unsampled_info = F_unsampled_info_phasing[:l-sampled_sv_num]
+
+            Q_SV_unsampled = Q_unsampled[unsampled_sv_idx_list_sorted]
 
             remaining_const = max(0, const - sampled_sv_num)
-            F_SNV = F_phasing[:, sampled_sv_num:const]
-            F_SNV_info = F_info_phasing[sampled_sv_num:const]
+
+            F_SNV = F_phasing[:, sampled_sv_num:sampled_sv_num + remaining_const]
+            F_SNV_info = F_info_phasing[sampled_sv_num:sampled_sv_num + remaining_const]
+
             Q_SNV = Q[sampled_sv_num:const]
+
+
             F_SNV_unsampled = F_unsampled_phasing[:, (l-sampled_sv_num):]
             F_SNV_unsampled_info = F_unsampled_info_phasing[(l-sampled_sv_num):]
             Q_SNV_unsampled = Q_unsampled[(l-sampled_sv_num):]
 
+            # Printing shapes of all matrices for check
+            print("F_SV shape:", F_SV.shape) 
+            print("F_SV_info length:", len(F_SV_info))
+            print("Q_SV shape:", Q_SV.shape)  # This should be sv_ub x copy number total
+            print("F_SV_unsampled shape:", F_SV_unsampled.shape)
+            print("F_SV_unsampled_info length:", len(F_SV_unsampled_info))
+            print("Q_SV_unsampled shape:", Q_SV_unsampled.shape)
+            print("F_SNV shape:", F_SNV.shape)
+            print("F_SNV_info shape:", len(F_SNV_info))
+            print("Q_SNV shape:", Q_SNV.shape)
+            print("F_SNV_unsampled shape:", F_SNV_unsampled.shape)
+            print("F_SNV_unsampled_info length:", len(F_SNV_unsampled_info))
+            print("Q_SNV_unsampled shape:", Q_SNV_unsampled.shape)
 
 
-
-
-            # # After creating Q_SNV and Q_SNV_unsampled
-            # for q in [Q_SNV, Q_SNV_unsampled]:
-            #     row_sums = np.sum(q, axis=1)
-            #     zero_sum_rows = np.where(row_sums == 0)[0]
-            #     multi_sum_rows = np.where(row_sums > 1)[0]
-                
-            #     if len(zero_sum_rows) > 0:
-            #         print(f"Warning: {len(zero_sum_rows)} SNVs are not assigned to any segment. Randomly assigning them.")
-            #         for row in zero_sum_rows:
-            #             q[row, np.random.randint(q.shape[1])] = 1
-                
-            #     if len(multi_sum_rows) > 0:
-            #         print(f"Warning: {len(multi_sum_rows)} SNVs are assigned to multiple segments. Keeping only one assignment.")
-            #         for row in multi_sum_rows:
-            #             non_zero_cols = np.where(q[row] > 0)[0]
-            #             keep_col = np.random.choice(non_zero_cols)
-            #             q[row] = 0
-            #             q[row, keep_col] = 1
-
-            # # Ensure Q is properly updated
-            # Q = np.vstack((Q_SV, Q_SNV))
-            # Q_unsampled = np.vstack((Q_SV_unsampled, Q_SNV_unsampled))
-
-            # assert np.all(np.sum(Q, axis=1) == 1), "Error: Not all rows in Q sum to 1"
-            # assert np.all(np.sum(Q_unsampled, axis=1) == 1), "Error: Not all rows in Q_unsampled sum to 1"
+            # There are 318 unsampled SVs, this is definitely the source of the problem 
+            # l = 318 number of SVs
+            # l - sampled_sv_num
 
 
             F_CNV = F_phasing[:,const:]
@@ -506,17 +522,41 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                                     print(f"breakpoint id {bp_id} at chr {chrom} pos {pos} is not found in copy number info.")
                         else:
                             print(f"Warning: Sampled SV index {new_idx} is out of bounds for F_SV with shape {F_SV.shape}")
-                    else:
+                    else: # This section has a gaping hole that doesn't deal with the case where there are unsampled SVs
                         new_idx = np.where(unsampled_sv_idx_list_sorted == bp_idx)[0][0]
                         if new_idx < F_SV_unsampled.shape[1]:  # Check if the index is within bounds
+                            
                             F_SV_unsampled[sample_idx][new_idx] = cn[0] if isinstance(cn, list) else cn
+                            if direction == '-' and (chrom, pos) in CN_endPos_dict:
+                                cn_idx = CN_endPos_dict[(chrom, pos)]
+                                if new_idx < Q_SV_unsampled.shape[0] and cn_idx < Q_SV_unsampled.shape[1]:
+                                    Q_SV_unsampled[new_idx][cn_idx] = 1
+                            elif direction == '+' and (chrom, pos) in CN_startPos_dict:
+                                cn_idx = CN_startPos_dict[(chrom, pos)]
+                                if new_idx < Q_SV_unsampled.shape[0] and cn_idx < Q_SV_unsampled.shape[1]:
+                                    Q_SV_unsampled[new_idx][cn_idx] = 1
+                            else:
+                                if chrom in list(seg_dic.keys()):
+                                    cn_idx = _get_seg_idx(seg_dic[chrom], pos)
+                                    if cn_idx is not None and new_idx < Q_SV_unsampled.shape[0] and cn_idx < Q_SV_unsampled.shape[1]:
+                                        Q_SV_unsampled[new_idx][cn_idx] = 1
+                                    else:
+                                        print(f"breakpoint id {bp_id} at chr {chrom} pos {pos} is not found in copy number info.")
+                                else:
+                                    print(f"breakpoint id {bp_id} at chr {chrom} pos {pos} is not found in copy number info.")
+
                         else:
                             print(f"Warning: Unsampled SV index {new_idx} is out of bounds for F_SV_unsampled with shape {F_SV_unsampled.shape}")
+        
 
-        for chrom, pos in list(SNV_sample_dict[sample].keys()):
+
+        # This section is assigning Q_SNVs but there is no similar section for Q_SVs FYI - possible cause of the problem, Q_SV needs to undergo the same assignment,
+        # then Q_SV_unsampled and Q_SNV_unsampled need to be concatenated to be returned as Q_SV
+
+        for chrom, pos in list(SNV_sample_dict[sample].keys()): # iterates through all the SNVs for the samples
             snv_idx = SNV_idx_dict[(chrom, pos)]
             cn = SNV_sample_dict[sample][(chrom, pos)]
-            if snv_idx in sampled_snv_idx_list_sorted:
+            if snv_idx in sampled_snv_idx_list_sorted: # If it's a sampled SNV, it assigns it a copy number assignmnet in Q
                 new_idx = np.where(sampled_snv_idx_list_sorted == snv_idx)[0][0]
                 F_SNV[sample_idx][new_idx] = cn[0] if isinstance(cn, list) else cn
                 if chrom in list(seg_dic.keys()):
@@ -529,7 +569,7 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                 else:
                     print(("snv id at chr " + str(chrom) + " pos " + str(
                         pos) + " is not found in copy number info."))
-            else:
+            else: # Otherwise it does it in the unsampled Q matrix
                 new_idx = np.where(unsampled_snv_idx_list_sorted == snv_idx)[0][0]
 
                 F_SNV_unsampled[sample_idx][new_idx] = cn[0] if isinstance(cn, list) else cn
@@ -537,13 +577,15 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
                 if chrom in list(seg_dic.keys()):
                     cn_idx = _get_seg_idx(seg_dic[chrom], pos)
                     if cn_idx != None:
-                        Q_SNV_unsampled[new_idx][cn_idx] = 1
+                        Q_SNV_unsampled[new_idx][cn_idx] = 1 # This does not link back all the way to the original SV array
                     else:
                         print(("snv at chr " + str(chrom) + " pos " + str(
                             pos) + " is not found in copy number info."))
                 else:
                     print(("snv id at chr " + str(chrom) + " pos " + str(
                         pos) + " is not found in copy number info."))
+                    
+
         print((l, g, r, const*(2*n-1)))
         for chrom in CN_sample_rec_dict[sample]:
             for (s,e) in CN_sample_rec_dict[sample][chrom]:
@@ -560,7 +602,64 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
     print((sampled_snv_idx_list_sorted,unsampled_snv_idx_list_sorted))
 
 
+    # CHECKING AREA
 
+    # At the beginning of make_matrices function, add:
+    print(f"Total SNVs: {len(SNV_idx_dict)}") 
+    print(f"Sampled SNVs: {len(sampled_snv_idx_list_sorted)}")
+    print(f"Unsampled SNVs: {len(unsampled_snv_idx_list_sorted)}")
+
+    # # After creating seg_dic, add:
+    # print("CNV segments:")
+    # for chrom, segs in seg_dic.items():
+    #     print(f"Chromosome {chrom}: {len(segs)} segments")
+    #     for idx, start, end in segs:
+    #         print(f"  Segment {idx}: {start}-{end}")
+    # for chrom, pos in list(SNV_sample_dict[sample].keys()):
+    #     snv_idx = SNV_idx_dict[(chrom, pos)]
+    #     if snv_idx in unsampled_snv_idx_list_sorted:
+    #         new_idx = np.where(unsampled_snv_idx_list_sorted == snv_idx)[0][0]
+    #         if chrom in list(seg_dic.keys()):
+    #             cn_idx = _get_seg_idx(seg_dic[chrom], pos)
+    #             if cn_idx is None:
+    #                 print(f"Warning: SNV at chr {chrom} pos {pos} does not fall within any CNV segment")
+    #         else:
+    #             print(f"Warning: No CNV data for chromosome {chrom} containing SNV at position {pos}")
+
+
+    # row_sums = np.sum(Q_unsampled, axis=1)
+    # if not np.all(row_sums == 1):
+    #     print(Q_unsampled.shape)
+    #     print("Warning: Not all rows in Q_unsampled sum to 1")
+    #     print(row_sums)
+    #     print("Rows that don't sum to 1:", np.where(row_sums != 1)[0])
+
+    # zero_rows = np.where(np.sum(Q_unsampled, axis=1) == 0)[0]
+    # if len(zero_rows) > 0:
+    #     print(f"Warning: {len(zero_rows)} SNVs were not assigned to any CNV segment")
+    #     for row in zero_rows:
+    #         snv_idx = unsampled_snv_idx_list_sorted[row]
+    #         # Find the corresponding (chrom, pos) for this SNV index
+    #         for (chrom, pos), idx in SNV_idx_dict.items():
+    #             if idx == snv_idx:
+    #                 print(f"Unassigned SNV: chr {chrom} pos {pos}")
+    #                 break
+
+    snv_chroms = set(chrom for chrom, pos in SNV_idx_dict.keys())
+    cnv_chroms = set(seg_dic.keys())
+    print("SNV chromosomes:", snv_chroms)
+    print("CNV chromosomes:", cnv_chroms)
+    print("Chromosomes in SNV but not CNV:", snv_chroms - cnv_chroms)
+
+    print("SNV chromosome 1 representation:", next(chrom for chrom, pos in SNV_idx_dict.keys() if chrom.endswith('1')))
+    print("CNV chromosome 1 representation:", next(chrom for chrom in seg_dic.keys() if chrom.endswith('1')))
+    
+    seg_dic = {str(chrom): segs for chrom, segs in seg_dic.items()}
+    
+    # Q gets passed back directly as a 120 by 326 object.
+
+    Q_unsampled = np.concatenate((Q_SV_unsampled, Q_SNV_unsampled), axis=0) # We need to recombined Q_unsampled back to Q.
+ 
     return F_phasing, F_unsampled_phasing, G_sampled, G_unsampled, Q, Q_unsampled, A, H, cv_attr, F_info_phasing, F_unsampled_info_phasing, sampled_snv_idx_list_sorted, unsampled_snv_idx_list_sorted, sampled_sv_idx_list_sorted, unsampled_sv_idx_list_sorted
     ### A and H are empty lists
 
@@ -568,9 +667,12 @@ def make_matrices(m, n, l, g, r, G, sampleList, BP_sample_dict, BP_idx_dict,  SN
 #         pos (int) position of segment that will be returned
 # output: i (int) index of segment where pos lies
 def _get_seg_idx(segs, pos):
+    pos = int(pos)
     for idx, bgn, end in segs:
-        if bgn <= pos and pos <= end:
+        if int(bgn) <= pos <= int(end):
             return idx
+
+    print(f"Warning: Position {pos} not found in any segment")
     return None
 
 
@@ -764,7 +866,10 @@ def get_sample_dict(reader):
 # CN_startPos_dict: key: (chrom, startPos), val: idx
 # CN_endPos_dict: key: (chrom, endPos), val: idx
 def get_CN_indices_dict(CN_sample_dict):
-
+    """
+    r = total number of copy number indices
+    
+    """
     chrom_dict = dict() # key: chrom, value: list of samples contain this chrom
     for sample in CN_sample_dict:
         for chrom in CN_sample_dict[sample]:
