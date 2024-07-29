@@ -12,6 +12,7 @@ import argparse
 import math  
 import numpy as np
 import gurobipy as gp
+from gurobipy import GRB
 
 # # # # # # # # # # # # #
 #   C O N S T A N T S   #
@@ -129,7 +130,7 @@ def get_U(F_phasing, C, n, R, W_node, l, only_leaf):
 #         W_all (np.array of int) [2n-1, 2n-1] number of breakpoints appearing along each edge in tree
 #         err_msg (None or str) None if no error occurs. str with error message if one does
 #  notes: l (int) is number of breakpoints. g (int) is the number of single nucleotide variants. r (int) is number of copy number regions
-def get_C(F_phasing, U, Q, G, A, H, n, c_max, lamb1, lamb2, time_limit=None):
+def get_C(F_phasing, U, Q, G, A, H, n, c_max, lamb1, lamb2, time_limit=None, early_term = True):
     l_g, r = Q.shape
     l, _ = G.shape
     g = l_g - l
@@ -165,7 +166,25 @@ def get_C(F_phasing, U, Q, G, A, H, n, c_max, lamb1, lamb2, time_limit=None):
     if time_limit != None:
         mod.params.TimeLimit = time_limit
 
-    mod.optimize()
+    # Adding a section that early terminates 
+    if early_term:
+        def cb(model, where):
+            if where == GRB.Callback.MIPNODE:
+                # Get model objective
+                obj = model.cbGet(GRB.Callback.MIPNODE_OBJBST)
+
+                # Has objective changed?
+                if abs(obj - model._cur_obj) > 1e-8:
+                    # If so, update incumbent and time
+                    model._cur_obj = obj
+                    model._time = time.time()
+
+            # Terminate if objective has not improved in 20s
+            if time.time() - model._time > 20:
+                model.terminate()
+        mod.optimize(callback=cb)
+    else:
+        mod.optimize()
 
     C = _as_solved(C)
     E = _as_solved(E)
