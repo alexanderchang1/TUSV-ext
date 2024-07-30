@@ -60,8 +60,8 @@ Outputs:
 An example input command looks like this (make sure Gurobi is activated in your environment)
 
 `
-python tusv-ext.py \
-  -i input_folder \
-  -o output_folder \
+python tusv-ext.py 
+  -i input_folder 
+  -o output_folder 
   -n 8 -c 10 -t 2 -r 2 -m 1000 -col -b -sv_ub 100 -C 200 -scan
 `
