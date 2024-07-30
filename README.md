@@ -6,10 +6,11 @@ This tool aims to deconvolve multi-regional bulk sequencing samples based on var
 
 This work is published in Xuecong Fu, Haoyun Lei, Yifeng Tao, Russell Schwartz, Reconstructing tumor clonal lineage trees incorporating single-nucleotide variants, copy number alterations and structural variations, Bioinformatics, Volume 38, Issue Supplement_1, July 2022, Pages i125–i133, https://doi.org/10.1093/bioinformatics/btac253
 
+This Python3 version is currently maintained by Alexander Chang.
 
 ## Requirements
 
-The program is written in Python2. Python3 version will come out soon.
+This is the Python 3 version, 
 
 The packages you will need to install are listed below.
 
@@ -18,7 +19,7 @@ The packages you will need to install are listed below.
 * `ete2`
 * `biopython`
 * `gurobipy`
-* `PyVCF`
+* `vcfpy` # switched from PyVCF due to lack of Python3 support.
 
 ### Gurobi License
 
@@ -55,3 +56,11 @@ Outputs:
 * `C.tsv` the C matrix which is variants copy number profiles of each clone
 * `U.tsv` the U matrix which is the frequencies of each clone in each sample
 * `T.dot` the inferred phylogenetic tree
+
+An example input command looks like this (make sure Gurobi is activated in your environment)
+
+python tusv-ext.py \
+  -i input_folder \
+  -o output_folder \
+  -n 8 -c 10 -t 2 -r 2 -m 1000 -col -b -sv_ub 100 -C 200 -scan
+
