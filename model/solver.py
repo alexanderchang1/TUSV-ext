@@ -13,6 +13,7 @@ import math
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
+import time
 
 # # # # # # # # # # # # #
 #   C O N S T A N T S   #
@@ -130,7 +131,7 @@ def get_U(F_phasing, C, n, R, W_node, l, only_leaf):
 #         W_all (np.array of int) [2n-1, 2n-1] number of breakpoints appearing along each edge in tree
 #         err_msg (None or str) None if no error occurs. str with error message if one does
 #  notes: l (int) is number of breakpoints. g (int) is the number of single nucleotide variants. r (int) is number of copy number regions
-def get_C(F_phasing, U, Q, G, A, H, n, c_max, lamb1, lamb2, time_limit=None, early_term = True):
+def get_C(F_phasing, U, Q, G, A, H, n, c_max, lamb1, lamb2, time_limit=None, early_term = False):
     l_g, r = Q.shape
     l, _ = G.shape
     g = l_g - l
@@ -169,19 +170,39 @@ def get_C(F_phasing, U, Q, G, A, H, n, c_max, lamb1, lamb2, time_limit=None, ear
     # Adding a section that early terminates 
     if early_term:
         def cb(model, where):
-            if where == GRB.Callback.MIPNODE:
-                # Get model objective
-                obj = model.cbGet(GRB.Callback.MIPNODE_OBJBST)
+            
+            
+            if where == GRB.Callback.MIP:
+                runtime = model.cbGet(GRB.Callback.RUNTIME)
+                objbst = model.cbGet(GRB.Callback.MIP_OBJBST)
+                objbnd = model.cbGet(GRB.Callback.MIP_OBJBND)
+                if objbst != 0:
+                    gap = abs(objbst - objbnd) / abs(objbst)
+                else:
+                    gap = 1
 
-                # Has objective changed?
-                if abs(obj - model._cur_obj) > 1e-8:
+                # if where == GRB.Callback.MIPNODE:
+                #     # Get model objective
+                #     obj = model.cbGet(GRB.Callback.MIPNODE_OBJBST)
+
+
+
+                # Has objective or gap changed?
+                if abs(objbst - model._cur_obj) > 1e-8 or abs(gap - model._gap) > 2e-2:
                     # If so, update incumbent and time
-                    model._cur_obj = obj
+                    model._cur_obj = objbst
+                    model._gap = gap
                     model._time = time.time()
 
-            # Terminate if objective has not improved in 20s
-            if time.time() - model._time > 20:
-                model.terminate()
+                # Terminate if objective has not improved in 100s
+                if time.time() - model._time > 10 and runtime > 100:
+                    print("Early termination trigger, no change in model objective for over 10 seconds. Code has run for at least 100 seconds, and metrics are not changing.")
+                    model.terminate()
+
+
+        mod._cur_obj = float('inf')
+        mod._time = time.time()
+        mod._gap = float('inf')
         mod.optimize(callback=cb)
     else:
         mod.optimize()
