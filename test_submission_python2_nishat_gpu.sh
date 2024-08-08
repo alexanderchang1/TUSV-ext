@@ -29,8 +29,8 @@ cd /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/TUSV-ext
 echo "Changed directory to /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/TUSV-ext"
 
 python tusv-ext.py \
-  -i /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/TUSV-ext/aer5_frozen/AER5/ \
-  -o /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/TUSV-ext/aer5_frozen/AER5_output/ \
+  -i /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/TUSV-ext/simulation_data/experiment_3_1_100_20_n/patient1/sample/ \
+  -o /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/TUSV-ext/simulation_data/experiment_3_1_100_20_n/patient1/output2/ \
   -n 3 -c 10 -t 2 -r 2 -m 1000 -col -b -sv_ub 80 -C 120
 echo "Finished running tusv-ext.py"
 
