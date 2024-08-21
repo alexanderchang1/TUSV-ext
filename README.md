@@ -16,7 +16,7 @@ The packages you will need to install are listed below.
 
 * `numpy`
 * `graphviz`
-* `ete2`
+* `ete3`
 * `biopython`
 * `gurobipy`
 * `vcfpy` # switched from PyVCF due to lack of Python3 support.
